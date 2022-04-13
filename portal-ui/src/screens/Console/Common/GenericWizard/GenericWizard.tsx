@@ -165,6 +165,9 @@ const GenericWizard = ({
           {wizardSteps.map((step, index) => {
             return (
               <ListItem
+                id={
+                  "wizard-step-" + step.label.toLowerCase().replaceAll(" ", "-")
+                }
                 button
                 disableRipple
                 onClick={() => pageChange(index)}

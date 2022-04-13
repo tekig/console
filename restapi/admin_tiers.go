@@ -19,14 +19,14 @@ package restapi
 import (
 	"context"
 	"encoding/base64"
-	"time"
+	"strconv"
 
-	"github.com/minio/madmin-go"
-
+	"github.com/dustin/go-humanize"
 	"github.com/go-openapi/runtime/middleware"
 	"github.com/minio/console/models"
 	"github.com/minio/console/restapi/operations"
 	"github.com/minio/console/restapi/operations/admin_api"
+	"github.com/minio/madmin-go"
 )
 
 func registerAdminTiersHandlers(api *operations.ConsoleAPI) {
@@ -71,10 +71,12 @@ func getTiers(ctx context.Context, client MinioAdmin) (*models.TierListResponse,
 	if err != nil {
 		return nil, err
 	}
-
+	tierInfo, err := client.tierStats(ctx)
+	if err != nil {
+		return nil, err
+	}
 	var tiersList []*models.Tier
 	for i := range tiers {
-
 		switch tiers[i].Type {
 		case madmin.S3:
 			tiersList = append(tiersList, &models.Tier{
@@ -88,6 +90,9 @@ func getTiers(ctx context.Context, client MinioAdmin) (*models.TierListResponse,
 					Region:       tiers[i].S3.Region,
 					Secretkey:    tiers[i].S3.SecretKey,
 					Storageclass: tiers[i].S3.StorageClass,
+					Usage:        humanize.IBytes(tierInfo[i+1].Stats.TotalSize),
+					Objects:      strconv.Itoa(tierInfo[i+1].Stats.NumObjects),
+					Versions:     strconv.Itoa(tierInfo[i+1].Stats.NumVersions),
 				},
 			})
 		case madmin.GCS:
@@ -100,6 +105,9 @@ func getTiers(ctx context.Context, client MinioAdmin) (*models.TierListResponse,
 					Name:     tiers[i].Name,
 					Prefix:   tiers[i].GCS.Prefix,
 					Region:   tiers[i].GCS.Region,
+					Usage:    humanize.IBytes(tierInfo[i+1].Stats.TotalSize),
+					Objects:  strconv.Itoa(tierInfo[i+1].Stats.NumObjects),
+					Versions: strconv.Itoa(tierInfo[i+1].Stats.NumVersions),
 				},
 			})
 		case madmin.Azure:
@@ -113,6 +121,9 @@ func getTiers(ctx context.Context, client MinioAdmin) (*models.TierListResponse,
 					Name:        tiers[i].Name,
 					Prefix:      tiers[i].Azure.Prefix,
 					Region:      tiers[i].Azure.Region,
+					Usage:       humanize.IBytes(tierInfo[i+1].Stats.TotalSize),
+					Objects:     strconv.Itoa(tierInfo[i+1].Stats.NumObjects),
+					Versions:    strconv.Itoa(tierInfo[i+1].Stats.NumVersions),
 				},
 			})
 		case madmin.Unsupported:
@@ -138,8 +149,8 @@ func getTiersResponse(session *models.Principal) (*models.TierListResponse, *mod
 	// create a minioClient interface implementation
 	// defining the client to be used
 	adminClient := AdminClient{Client: mAdmin}
-	// 20 seconds timeout
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	// serialize output
 	tiersResp, err := getTiers(ctx, adminClient)
@@ -228,8 +239,7 @@ func getAddTierResponse(session *models.Principal, params *admin_api.AddTierPara
 	// create a minioClient interface implementation
 	// defining the client to be used
 	adminClient := AdminClient{Client: mAdmin}
-	// 20 seconds timeout
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	// serialize output
 	errTier := addTier(ctx, adminClient, params)
@@ -311,8 +321,8 @@ func getGetTierResponse(session *models.Principal, params *admin_api.GetTierPara
 	// create a minioClient interface implementation
 	// defining the client to be used
 	adminClient := AdminClient{Client: mAdmin}
-	// 20 seconds timeout
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	// serialize output
 	addTierResp, err := getTier(ctx, adminClient, params)
@@ -347,8 +357,8 @@ func getEditTierCredentialsResponse(session *models.Principal, params *admin_api
 	// create a minioClient interface implementation
 	// defining the client to be used
 	adminClient := AdminClient{Client: mAdmin}
-	// 20 seconds timeout
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	// serialize output
 	err = editTierCredentials(ctx, adminClient, params)

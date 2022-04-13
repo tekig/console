@@ -23,6 +23,7 @@ import Grid from "@mui/material/Grid";
 import { actionsTray, fieldBasic } from "../common/styleLibrary";
 import HelpIcon from "../../../../../icons/HelpIcon";
 import clsx from "clsx";
+import { InputProps as StandardInputProps } from "@mui/material/Input/Input";
 
 interface IFormSwitch {
   label?: string;
@@ -38,13 +39,11 @@ interface IFormSwitch {
   checked: boolean;
   switchOnly?: boolean;
   indicatorLabels?: string[];
+  extraInputProps?: StandardInputProps["inputProps"];
 }
 
 const styles = (theme: Theme) =>
   createStyles({
-    divContainer: {
-      marginBottom: 20,
-    },
     indicatorLabelOn: {
       fontWeight: "bold",
       color: "#081C42 !important",
@@ -125,6 +124,7 @@ const FormSwitchWrapper = ({
   description = "",
   classes,
   indicatorLabels,
+  extraInputProps = {},
 }: IFormSwitch) => {
   const switchComponent = (
     <React.Fragment>
@@ -144,12 +144,13 @@ const FormSwitchWrapper = ({
         onChange={onChange}
         color="primary"
         name={name}
-        inputProps={{ "aria-label": "primary checkbox" }}
+        inputProps={{ "aria-label": "primary checkbox", ...extraInputProps }}
         disabled={disabled}
         disableRipple
         disableFocusRipple
         disableTouchRipple
         value={value}
+        id={id}
       />
       {!switchOnly && (
         <span
@@ -168,45 +169,42 @@ const FormSwitchWrapper = ({
   }
 
   return (
-    <div className={classes.divContainer}>
+    <div>
       <Grid container alignItems={"center"}>
-        <Grid item xs>
-          <Grid container>
-            <Grid item xs={12} sm={4} md={3}>
-              {label !== "" && (
-                <InputLabel htmlFor={id} className={classes.inputLabel}>
-                  <span>{label}</span>
-                  {tooltip !== "" && (
-                    <div className={classes.tooltipContainer}>
-                      <Tooltip title={tooltip} placement="top-start">
-                        <div className={classes.tooltip}>
-                          <HelpIcon />
-                        </div>
-                      </Tooltip>
+        <Grid item xs={12} sm={8} md={8}>
+          {label !== "" && (
+            <InputLabel htmlFor={id} className={classes.inputLabel}>
+              <span>{label}</span>
+              {tooltip !== "" && (
+                <div className={classes.tooltipContainer}>
+                  <Tooltip title={tooltip} placement="top-start">
+                    <div className={classes.tooltip}>
+                      <HelpIcon />
                     </div>
-                  )}
-                </InputLabel>
+                  </Tooltip>
+                </div>
               )}
-            </Grid>
-            <Grid item xs={12} sm textAlign={"left"}>
-              {description !== "" && (
-                <Typography component="p" className={classes.fieldDescription}>
-                  {description}
-                </Typography>
-              )}
-            </Grid>
-          </Grid>
+            </InputLabel>
+          )}
         </Grid>
-
         <Grid
           item
           xs={12}
-          sm={2}
+          sm={label !== "" ? 4 : 12}
+          md={label !== "" ? 4 : 12}
           textAlign={"right"}
+          justifyContent={"end"}
           className={classes.switchContainer}
         >
           {switchComponent}
         </Grid>
+        {description !== "" && (
+          <Grid item xs={12} textAlign={"left"}>
+            <Typography component="p" className={classes.fieldDescription}>
+              {description}
+            </Typography>
+          </Grid>
+        )}
       </Grid>
     </div>
   );

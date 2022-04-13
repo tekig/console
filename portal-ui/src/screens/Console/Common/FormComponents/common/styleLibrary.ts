@@ -360,21 +360,35 @@ export const objectBrowserCommon = {
     height: 40,
     lineHeight: "40px",
   },
+  breadcrumbsMain: {
+    display: "flex",
+  },
   breadcrumbs: {
-    fontSize: 10,
-    color: "#000",
-    marginTop: 2,
+    fontSize: 12,
+    color: "#969FA8",
+    fontWeight: "bold",
+    border: "#EAEDEE 1px solid",
+    height: 38,
+    display: "flex",
+    alignItems: "center",
+    backgroundColor: "#FCFCFD",
+    marginRight: 10,
     "& a": {
       textDecoration: "none",
-      color: "#000",
+      color: "#969FA8",
       "&:hover": {
         textDecoration: "underline",
       },
     },
-    "&.fullSize": {
-      fontSize: 18,
-      marginLeft: 10,
+    "& .min-icon": {
+      width: 16,
+      minWidth: 16,
     },
+  },
+  additionalOptions: {
+    paddingRight: "10px",
+    display: "flex",
+    alignItems: "center",
   },
   smallLabel: {
     color: "#9C9C9C",
@@ -388,6 +402,16 @@ export const objectBrowserCommon = {
   detailsSpacer: {
     marginRight: 18,
   },
+  breadcrumbsList: {
+    textOverflow: "ellipsis" as const,
+    overflow: "hidden" as const,
+    whiteSpace: "nowrap" as const,
+    display: "inline-block" as const,
+    flexGrow: 1,
+    textAlign: "left" as const,
+    marginLeft: 15,
+    marginRight: 10,
+  },
 };
 
 export const selectorsCommon = {
@@ -396,7 +420,7 @@ export const selectorsCommon = {
   },
 };
 
-export const settingsCommon = {
+export const settingsCommon: any = {
   customTitle: {
     fontSize: 18,
     color: "#000",
@@ -935,7 +959,7 @@ const commonStateIcon = {
   marginTop: 6,
 };
 
-export const commonDashboardInfocard = {
+export const commonDashboardInfocard: any = {
   cardIconContainer: {
     display: "flex" as const,
     position: "relative" as const,
@@ -1134,7 +1158,7 @@ export const spacingUtils: any = {
   },
 };
 
-export const formFieldStyles = {
+export const formFieldStyles: any = {
   formFieldRow: {
     marginBottom: ".8rem",
     "& .MuiInputLabel-root": {
@@ -1315,7 +1339,11 @@ export const detailsPanel: any = {
     fontSize: 14,
     fontWeight: "bold",
     color: "#000",
-    padding: "12px 22px 8px 22px",
+    padding: "12px 30px 8px 22px",
+    whiteSpace: "nowrap",
+    textOverflow: "ellipsis",
+    overflow: "hidden",
+    alignItems: "center",
   },
   objectActions: {
     backgroundColor: "#F8F8F8",
@@ -1339,6 +1367,20 @@ export const detailsPanel: any = {
         borderBottom: 0,
       },
     },
+  },
+};
+
+export const objectBrowserExtras = {
+  listIcon: {
+    display: "block",
+    marginTop: "-10px",
+    "& .min-icon": {
+      width: 20,
+      height: 20,
+    },
+  },
+  titleSpacer: {
+    marginLeft: 10,
   },
 };
 

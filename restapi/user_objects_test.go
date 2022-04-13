@@ -103,7 +103,8 @@ func (c s3ClientMock) shareDownload(ctx context.Context, versionID string, expir
 }
 
 func Test_listObjects(t *testing.T) {
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	t1 := time.Now()
 	tretention := time.Now()
 	minClient := minioClientMock{}
@@ -576,14 +577,15 @@ func Test_listObjects(t *testing.T) {
 }
 
 func Test_deleteObjects(t *testing.T) {
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	s3Client1 := s3ClientMock{}
-	minioClient1 := minioClientMock{}
 	type args struct {
 		bucket     string
 		path       string
 		versionID  string
 		recursive  bool
+		nonCurrent bool
 		listFunc   func(ctx context.Context, opts mc.ListOptions) <-chan *mc.ClientContent
 		removeFunc func(ctx context.Context, isIncomplete, isRemoveBucket, isBypass bool, contentCh <-chan *mc.ClientContent) <-chan mc.RemoveResult
 	}
@@ -595,9 +597,10 @@ func Test_deleteObjects(t *testing.T) {
 		{
 			test: "Remove single object",
 			args: args{
-				path:      "obj.txt",
-				versionID: "",
-				recursive: false,
+				path:       "obj.txt",
+				versionID:  "",
+				recursive:  false,
+				nonCurrent: false,
 				removeFunc: func(ctx context.Context, isIncomplete, isRemoveBucket, isBypass bool, contentCh <-chan *mc.ClientContent) <-chan mc.RemoveResult {
 					resultCh := make(chan mc.RemoveResult, 1)
 					resultCh <- mc.RemoveResult{Err: nil}
@@ -610,9 +613,10 @@ func Test_deleteObjects(t *testing.T) {
 		{
 			test: "Error on Remove single object",
 			args: args{
-				path:      "obj.txt",
-				versionID: "",
-				recursive: false,
+				path:       "obj.txt",
+				versionID:  "",
+				recursive:  false,
+				nonCurrent: false,
 				removeFunc: func(ctx context.Context, isIncomplete, isRemoveBucket, isBypass bool, contentCh <-chan *mc.ClientContent) <-chan mc.RemoveResult {
 					resultCh := make(chan mc.RemoveResult, 1)
 					resultCh <- mc.RemoveResult{Err: probe.NewError(errors.New("probe error"))}
@@ -625,9 +629,10 @@ func Test_deleteObjects(t *testing.T) {
 		{
 			test: "Remove multiple objects",
 			args: args{
-				path:      "path/",
-				versionID: "",
-				recursive: true,
+				path:       "path/",
+				versionID:  "",
+				recursive:  true,
+				nonCurrent: false,
 				removeFunc: func(ctx context.Context, isIncomplete, isRemoveBucket, isBypass bool, contentCh <-chan *mc.ClientContent) <-chan mc.RemoveResult {
 					resultCh := make(chan mc.RemoveResult, 1)
 					resultCh <- mc.RemoveResult{Err: nil}
@@ -648,9 +653,10 @@ func Test_deleteObjects(t *testing.T) {
 			// while deleting multiple objects
 			test: "Error on Remove multiple objects 1",
 			args: args{
-				path:      "path/",
-				versionID: "",
-				recursive: true,
+				path:       "path/",
+				versionID:  "",
+				recursive:  true,
+				nonCurrent: false,
 				removeFunc: func(ctx context.Context, isIncomplete, isRemoveBucket, isBypass bool, contentCh <-chan *mc.ClientContent) <-chan mc.RemoveResult {
 					resultCh := make(chan mc.RemoveResult, 1)
 					resultCh <- mc.RemoveResult{Err: nil}
@@ -671,9 +677,58 @@ func Test_deleteObjects(t *testing.T) {
 			// while deleting multiple objects
 			test: "Error on Remove multiple objects 2",
 			args: args{
-				path:      "path/",
-				versionID: "",
-				recursive: true,
+				path:       "path/",
+				versionID:  "",
+				recursive:  true,
+				nonCurrent: false,
+				removeFunc: func(ctx context.Context, isIncomplete, isRemoveBucket, isBypass bool, contentCh <-chan *mc.ClientContent) <-chan mc.RemoveResult {
+					resultCh := make(chan mc.RemoveResult, 1)
+					resultCh <- mc.RemoveResult{Err: probe.NewError(errors.New("probe error"))}
+					close(resultCh)
+					return resultCh
+				},
+				listFunc: func(ctx context.Context, opts mc.ListOptions) <-chan *mc.ClientContent {
+					ch := make(chan *mc.ClientContent, 1)
+					ch <- &mc.ClientContent{}
+					close(ch)
+					return ch
+				},
+			},
+			wantError: errors.New("probe error"),
+		},
+		{
+			// Description handle error when error happens on remove function
+			// while deleting multiple objects
+			test: "Remove non current objects",
+			args: args{
+				path:       "path/",
+				versionID:  "",
+				recursive:  true,
+				nonCurrent: true,
+				removeFunc: func(ctx context.Context, isIncomplete, isRemoveBucket, isBypass bool, contentCh <-chan *mc.ClientContent) <-chan mc.RemoveResult {
+					resultCh := make(chan mc.RemoveResult, 1)
+					resultCh <- mc.RemoveResult{Err: nil}
+					close(resultCh)
+					return resultCh
+				},
+				listFunc: func(ctx context.Context, opts mc.ListOptions) <-chan *mc.ClientContent {
+					ch := make(chan *mc.ClientContent, 1)
+					ch <- &mc.ClientContent{}
+					close(ch)
+					return ch
+				},
+			},
+			wantError: nil,
+		},
+		{
+			// Description handle error when error happens on remove function
+			// while deleting multiple objects
+			test: "Error deleting non current objects",
+			args: args{
+				path:       "path/",
+				versionID:  "",
+				recursive:  true,
+				nonCurrent: true,
 				removeFunc: func(ctx context.Context, isIncomplete, isRemoveBucket, isBypass bool, contentCh <-chan *mc.ClientContent) <-chan mc.RemoveResult {
 					resultCh := make(chan mc.RemoveResult, 1)
 					resultCh <- mc.RemoveResult{Err: probe.NewError(errors.New("probe error"))}
@@ -696,7 +751,7 @@ func Test_deleteObjects(t *testing.T) {
 		t.Run(tt.test, func(t *testing.T) {
 			mcListMock = tt.args.listFunc
 			mcRemoveMock = tt.args.removeFunc
-			err := deleteObjects(ctx, s3Client1, minioClient1, tt.args.bucket, tt.args.path, tt.args.versionID, tt.args.recursive, false)
+			err := deleteObjects(ctx, s3Client1, tt.args.bucket, tt.args.path, tt.args.versionID, tt.args.recursive, false, tt.args.nonCurrent)
 			if err == nil && tt.wantError != nil {
 				t.Errorf("deleteObjects() error: %v, wantErr: %v", err, tt.wantError)
 			} else if err != nil && tt.wantError == nil {
@@ -712,7 +767,8 @@ func Test_deleteObjects(t *testing.T) {
 
 func Test_shareObject(t *testing.T) {
 	assert := assert.New(t)
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	client := s3ClientMock{}
 	type args struct {
 		versionID string
@@ -791,7 +847,8 @@ func Test_shareObject(t *testing.T) {
 }
 
 func Test_putObjectLegalHold(t *testing.T) {
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	client := minioClientMock{}
 	type args struct {
 		bucket        string
@@ -860,7 +917,8 @@ func Test_putObjectLegalHold(t *testing.T) {
 
 func Test_putObjectRetention(t *testing.T) {
 	assert := assert.New(t)
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	client := minioClientMock{}
 	type args struct {
 		bucket        string
@@ -991,7 +1049,8 @@ func Test_putObjectRetention(t *testing.T) {
 
 func Test_deleteObjectRetention(t *testing.T) {
 	assert := assert.New(t)
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	client := minioClientMock{}
 	type args struct {
 		bucket        string
@@ -1032,7 +1091,8 @@ func Test_deleteObjectRetention(t *testing.T) {
 
 func Test_getObjectInfo(t *testing.T) {
 	assert := assert.New(t)
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	client := minioClientMock{}
 
 	type args struct {

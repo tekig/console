@@ -39,7 +39,7 @@ import { AppState } from "../../../../store";
 import { ErrorResponseHandler } from "../../../../common/types";
 import api from "../../../../common/api";
 import PageHeader from "../../Common/PageHeader/PageHeader";
-import { CircleIcon, TrashIcon } from "../../../../icons";
+import { CircleIcon, MinIOTierIconXs, TrashIcon } from "../../../../icons";
 import { niceBytes } from "../../../../common/utils";
 import ScreenTitle from "../../Common/ScreenTitle/ScreenTitle";
 import EditIcon from "../../../../icons/EditIcon";
@@ -50,7 +50,8 @@ import BackLink from "../../../../common/BackLink";
 import VerticalTabs from "../../Common/VerticalTabs/VerticalTabs";
 import BoxIconButton from "../../Common/BoxIconButton/BoxIconButton";
 import withSuspense from "../../Common/Components/withSuspense";
-import PVCDetails from "./PVCDetails";
+import { IAM_PAGES } from "../../../../common/SecureComponent/permissions";
+import { tenantIsOnline } from "../ListTenants/utils";
 
 const TenantYAML = withSuspense(React.lazy(() => import("./TenantYAML")));
 const TenantSummary = withSuspense(React.lazy(() => import("./TenantSummary")));
@@ -58,12 +59,23 @@ const TenantLicense = withSuspense(React.lazy(() => import("./TenantLicense")));
 const PoolsSummary = withSuspense(React.lazy(() => import("./PoolsSummary")));
 const PodsSummary = withSuspense(React.lazy(() => import("./PodsSummary")));
 const TenantLogging = withSuspense(React.lazy(() => import("./TenantLogging")));
+const TenantEvents = withSuspense(React.lazy(() => import("./TenantEvents")));
 const VolumesSummary = withSuspense(
   React.lazy(() => import("./VolumesSummary"))
 );
 const TenantMetrics = withSuspense(React.lazy(() => import("./TenantMetrics")));
+const TenantTrace = withSuspense(React.lazy(() => import("./TenantTrace")));
+const TenantVolumes = withSuspense(
+  React.lazy(() => import("./pvcs/TenantVolumes"))
+);
+const TenantIdentityProvider = withSuspense(
+  React.lazy(() => import("./TenantIdentityProvider"))
+);
 const TenantSecurity = withSuspense(
   React.lazy(() => import("./TenantSecurity"))
+);
+const TenantEncryption = withSuspense(
+  React.lazy(() => import("./TenantEncryption"))
 );
 const DeleteTenant = withSuspense(
   React.lazy(() => import("../ListTenants/DeleteTenant"))
@@ -166,7 +178,6 @@ const TenantDetails = ({
   match,
   history,
   loadingTenant,
-  currentTab,
   selectedTenant,
   tenantInfo,
   selectedNamespace,
@@ -175,7 +186,6 @@ const TenantDetails = ({
   setTenantDetailsLoad,
   setTenantName,
   setTenantInfo,
-  setTenantTab,
 }: ITenantDetailsProps) => {
   const [yamlScreenOpen, setYamlScreenOpen] = useState<boolean>(false);
 
@@ -320,16 +330,16 @@ const TenantDetails = ({
           closeDeleteModalAndRefresh={closeDeleteModalAndRefresh}
         />
       )}
+
       <PageHeader
         label={
           <Fragment>
-            <Link to={"/tenants"} className={classes.breadcrumLink}>
-              Tenants
-            </Link>
+            <BackLink to={IAM_PAGES.TENANTS} label="Tenants" />
           </Fragment>
         }
+        actions={<React.Fragment />}
       />
-      <BackLink to={"/tenants"} label={"Return to Tenants"} />
+
       <PageLayout className={classes.pageContainer}>
         <Grid item xs={12}>
           <ScreenTitle
@@ -371,7 +381,7 @@ const TenantDetails = ({
                   }}
                   size="large"
                 >
-                  <span>Delete Tenant</span> <TrashIcon />
+                  <span>Delete</span> <TrashIcon />
                 </BoxIconButton>
                 <BoxIconButton
                   classes={{
@@ -386,8 +396,25 @@ const TenantDetails = ({
                   }}
                   size="large"
                 >
-                  <span>Edit Tenant</span>
+                  <span>YAML</span>
                   <EditIcon />
+                </BoxIconButton>
+                <BoxIconButton
+                  classes={{
+                    root: classes.tenantActionButton,
+                  }}
+                  tooltip={"Management Console"}
+                  onClick={() => {
+                    history.push(
+                      `/namespaces/${tenantNamespace}/tenants/${tenantName}/hop`
+                    );
+                  }}
+                  disabled={!tenantInfo || !tenantIsOnline(tenantInfo)}
+                  variant={"outlined"}
+                  color="primary"
+                >
+                  <span>Console</span>{" "}
+                  <MinIOTierIconXs style={{ height: 16 }} />
                 </BoxIconButton>
                 <BoxIconButton
                   classes={{
@@ -401,7 +428,7 @@ const TenantDetails = ({
                     setTenantDetailsLoad(true);
                   }}
                 >
-                  <span>Reload</span> <RefreshIcon />
+                  <span>Refresh</span> <RefreshIcon />
                 </BoxIconButton>
               </div>
             }
@@ -416,51 +443,67 @@ const TenantDetails = ({
               <Router history={history}>
                 <Switch>
                   <Route
-                    path="/namespaces/:tenantNamespace/tenants/:tenantName/summary"
+                    path={IAM_PAGES.NAMESPACE_TENANT_SUMMARY}
                     component={TenantSummary}
                   />
                   <Route
-                    path="/namespaces/:tenantNamespace/tenants/:tenantName/metrics"
+                    path={IAM_PAGES.NAMESPACE_TENANT_METRICS}
                     component={TenantMetrics}
                   />
                   <Route
-                    path="/namespaces/:tenantNamespace/tenants/:tenantName/security"
+                    path={IAM_PAGES.NAMESPACE_TENANT_TRACE}
+                    component={TenantTrace}
+                  />
+                  <Route
+                    path={IAM_PAGES.NAMESPACE_TENANT_IDENTITY_PROVIDER}
+                    component={TenantIdentityProvider}
+                  />
+                  <Route
+                    path={IAM_PAGES.NAMESPACE_TENANT_SECURITY}
                     component={TenantSecurity}
                   />
                   <Route
-                    path="/namespaces/:tenantNamespace/tenants/:tenantName/pools"
+                    path={IAM_PAGES.NAMESPACE_TENANT_ENCRYPTION}
+                    component={TenantEncryption}
+                  />
+                  <Route
+                    path={IAM_PAGES.NAMESPACE_TENANT_POOLS}
                     component={PoolsSummary}
                   />
                   <Route
-                    path="/namespaces/:tenantNamespace/tenants/:tenantName/pods/:podName"
+                    path={IAM_PAGES.NAMESPACE_TENANT_PODS}
                     component={PodDetails}
                   />
                   <Route
-                    path="/namespaces/:tenantNamespace/tenants/:tenantName/pods"
+                    path={IAM_PAGES.NAMESPACE_TENANT_PODS_LIST}
                     component={PodsSummary}
                   />
                   <Route
-                    path="/namespaces/:tenantNamespace/tenants/:tenantName/pvcs/:PVCName"
-                    component={PVCDetails}
+                    path={IAM_PAGES.NAMESPACE_TENANT_PVCS}
+                    component={TenantVolumes}
                   />
                   <Route
-                    path="/namespaces/:tenantNamespace/tenants/:tenantName/volumes"
+                    path={IAM_PAGES.NAMESPACE_TENANT_VOLUMES}
                     component={VolumesSummary}
                   />
                   <Route
-                    path="/namespaces/:tenantNamespace/tenants/:tenantName/license"
+                    path={IAM_PAGES.NAMESPACE_TENANT_LICENSE}
                     component={TenantLicense}
                   />
                   <Route
-                    path="/namespaces/:tenantNamespace/tenants/:tenantName/monitoring"
+                    path={IAM_PAGES.NAMESPACE_TENANT_MONITORING}
                     component={TenantMonitoring}
                   />
                   <Route
-                    path="/namespaces/:tenantNamespace/tenants/:tenantName/logging"
+                    path={IAM_PAGES.NAMESPACE_TENANT_LOGGING}
                     component={TenantLogging}
                   />
                   <Route
-                    path="/namespaces/:tenantNamespace/tenants/:tenantName"
+                    path={IAM_PAGES.NAMESPACE_TENANT_EVENTS}
+                    component={TenantEvents}
+                  />
+                  <Route
+                    path={IAM_PAGES.NAMESPACE_TENANT}
                     component={() => (
                       <Redirect
                         to={`/namespaces/${tenantNamespace}/tenants/${tenantName}/summary`}
@@ -490,10 +533,26 @@ const TenantDetails = ({
           }}
           {{
             tabConfig: {
+              label: "Identity Provider",
+              value: "identity-provider",
+              component: Link,
+              to: getRoutePath("identity-provider"),
+            },
+          }}
+          {{
+            tabConfig: {
               label: "Security",
               value: "security",
               component: Link,
               to: getRoutePath("security"),
+            },
+          }}
+          {{
+            tabConfig: {
+              label: "Encryption",
+              value: "encryption",
+              component: Link,
+              to: getRoutePath("encryption"),
             },
           }}
           {{
@@ -539,6 +598,14 @@ const TenantDetails = ({
           }}
           {{
             tabConfig: {
+              label: "Events",
+              value: "events",
+              component: Link,
+              to: getRoutePath("events"),
+            },
+          }}
+          {{
+            tabConfig: {
               label: "License",
               value: "license",
               component: Link,
@@ -553,7 +620,6 @@ const TenantDetails = ({
 
 const mapState = (state: AppState) => ({
   loadingTenant: state.tenants.tenantDetails.loadingTenant,
-  currentTab: state.tenants.tenantDetails.currentTab,
   selectedTenant: state.tenants.tenantDetails.currentTenant,
   selectedNamespace: state.tenants.tenantDetails.currentNamespace,
   tenantInfo: state.tenants.tenantDetails.tenantInfo,
@@ -565,7 +631,6 @@ const connector = connect(mapState, {
   setTenantDetailsLoad,
   setTenantName,
   setTenantInfo,
-  setTenantTab,
 });
 
 export default withStyles(styles)(connector(TenantDetails));

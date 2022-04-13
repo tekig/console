@@ -20,7 +20,6 @@ import { Theme } from "@mui/material/styles";
 import createStyles from "@mui/styles/createStyles";
 import withStyles from "@mui/styles/withStyles";
 import get from "lodash/get";
-import * as reactMoment from "react-moment";
 import Grid from "@mui/material/Grid";
 import { BucketInfo, LifeCycleItem } from "../types";
 import { AddIcon, TiersIcon } from "../../../../icons";
@@ -37,11 +36,13 @@ import AddLifecycleModal from "./AddLifecycleModal";
 import TableWrapper from "../../Common/TableWrapper/TableWrapper";
 import HelpBox from "../../../../common/HelpBox";
 import PanelTitle from "../../Common/PanelTitle/PanelTitle";
-import SecureComponent, {
+import {
   hasPermission,
-} from "../../../../common/SecureComponent/SecureComponent";
+  SecureComponent,
+} from "../../../../common/SecureComponent";
 import { IAM_SCOPES } from "../../../../common/SecureComponent/permissions";
 import RBIconButton from "./SummaryItems/RBIconButton";
+import DeleteBucketLifecycleRule from "./DeleteBucketLifecycleRule";
 
 const styles = (theme: Theme) =>
   createStyles({
@@ -71,6 +72,11 @@ const BucketLifecyclePanel = ({
   const [lifecycleRecords, setLifecycleRecords] = useState<LifeCycleItem[]>([]);
   const [addLifecycleOpen, setAddLifecycleOpen] = useState<boolean>(false);
   const [editLifecycleOpen, setEditLifecycleOpen] = useState<boolean>(false);
+  const [selectedLifecycleRule, setSelectedLifecycleRule] =
+    useState<LifeCycleItem | null>(null);
+  const [deleteLifecycleOpen, setDeleteLifecycleOpen] =
+    useState<boolean>(false);
+  const [selectedID, setSelectedID] = useState<string | null>(null);
 
   const bucketName = match.params["bucketName"];
 
@@ -97,6 +103,7 @@ const BucketLifecyclePanel = ({
           })
           .catch((err: ErrorResponseHandler) => {
             console.error(err);
+            setLifecycleRecords([]);
             setLoadingLifecycle(false);
           });
       } else {
@@ -112,6 +119,7 @@ const BucketLifecyclePanel = ({
 
   const closeEditLCAndRefresh = (refresh: boolean) => {
     setEditLifecycleOpen(false);
+    setSelectedLifecycleRule(null);
     if (refresh) {
       setLoadingLifecycle(true);
     }
@@ -124,74 +132,134 @@ const BucketLifecyclePanel = ({
     }
   };
 
-  const expirationRender = (expiration: any) => {
-    if (expiration.days) {
-      return `${expiration.days} day${expiration.days > 1 ? "s" : ""}`;
+  const closeDelLCRefresh = (refresh: boolean) => {
+    setDeleteLifecycleOpen(false);
+    setSelectedID(null);
+
+    if (refresh) {
+      setLoadingLifecycle(true);
     }
-
-    if (expiration.date === "0001-01-01T00:00:00Z") {
-      return "";
-    }
-
-    return <reactMoment.default>{expiration.date}</reactMoment.default>;
-  };
-
-  const transitionRender = (transition: any) => {
-    if (transition.days) {
-      return `${transition.days} day${transition.days > 1 ? "s" : ""}`;
-    }
-
-    if (transition.date === "0001-01-01T00:00:00Z") {
-      return "";
-    }
-
-    return <reactMoment.default>{transition.date}</reactMoment.default>;
   };
 
   const renderStorageClass = (objectST: any) => {
-    const stClass = get(objectST, "transition.storage_class", "");
+    let stClass = get(objectST, "transition.storage_class", "");
+    stClass = get(objectST, "transition.noncurrent_storage_class", stClass);
 
     return stClass;
   };
 
   const lifecycleColumns = [
-    { label: "ID", elementKey: "id" },
+    {
+      label: "Type",
+      renderFullObject: true,
+      renderFunction: (el: LifeCycleItem) => {
+        if (!el) {
+          return <Fragment />;
+        }
+        if (
+          el.expiration &&
+          (el.expiration.days > 0 || el.expiration.noncurrent_expiration_days)
+        ) {
+          return <span>Expiry</span>;
+        }
+        if (
+          el.transition &&
+          (el.transition.days > 0 || el.transition.noncurrent_transition_days)
+        ) {
+          return <span>Transition</span>;
+        }
+        return <Fragment />;
+      },
+    },
+    {
+      label: "Version",
+      renderFullObject: true,
+      renderFunction: (el: LifeCycleItem) => {
+        if (!el) {
+          return <Fragment />;
+        }
+        if (el.expiration) {
+          if (el.expiration.days > 0) {
+            return <span>Current</span>;
+          } else if (el.expiration.noncurrent_expiration_days) {
+            return <span>Non-Current</span>;
+          }
+        }
+        if (el.transition) {
+          if (el.transition.days > 0) {
+            return <span>Current</span>;
+          } else if (el.transition.noncurrent_transition_days) {
+            return <span>Non-Current</span>;
+          }
+        }
+      },
+    },
+    {
+      label: "Tier",
+      elementKey: "storage_class",
+      renderFunction: renderStorageClass,
+      renderFullObject: true,
+    },
     {
       label: "Prefix",
       elementKey: "prefix",
     },
     {
+      label: "After",
+      renderFullObject: true,
+      renderFunction: (el: LifeCycleItem) => {
+        if (!el) {
+          return <Fragment />;
+        }
+        if (el.expiration) {
+          if (el.expiration.days > 0) {
+            return <span>{el.expiration.days} days</span>;
+          } else if (el.expiration.noncurrent_expiration_days) {
+            return <span>{el.expiration.noncurrent_expiration_days} days</span>;
+          }
+        }
+        if (el.transition) {
+          if (el.transition.days > 0) {
+            return <span>{el.transition.days} days</span>;
+          } else if (el.transition.noncurrent_transition_days) {
+            return <span>{el.transition.noncurrent_transition_days} days</span>;
+          }
+        }
+      },
+    },
+    {
       label: "Status",
       elementKey: "status",
     },
+  ];
+
+  const lifecycleActions = [
     {
-      label: "Expiration",
-      elementKey: "expiration",
-      renderFunction: expirationRender,
+      type: "view",
+
+      onClick(valueToSend: any): any {
+        setSelectedLifecycleRule(valueToSend);
+        setEditLifecycleOpen(true);
+      },
     },
     {
-      label: "Transition",
-      elementKey: "transition",
-      renderFunction: transitionRender,
-    },
-    {
-      label: "Storage Class",
-      elementKey: "storage_class",
-      renderFunction: renderStorageClass,
-      renderFullObject: true,
+      type: "delete",
+      onClick(valueToDelete: string): any {
+        setSelectedID(valueToDelete);
+        setDeleteLifecycleOpen(true);
+      },
+      sendOnlyId: true,
     },
   ];
 
   return (
     <Fragment>
-      {editLifecycleOpen && (
+      {editLifecycleOpen && selectedLifecycleRule && (
         <EditLifecycleConfiguration
           open={editLifecycleOpen}
           closeModalAndRefresh={closeEditLCAndRefresh}
           selectedBucket={bucketName}
-          lifecycle={{
-            id: "",
-          }}
+          lifecycleRule={selectedLifecycleRule}
         />
       )}
       {addLifecycleOpen && (
@@ -199,6 +267,14 @@ const BucketLifecyclePanel = ({
           open={addLifecycleOpen}
           bucketName={bucketName}
           closeModalAndRefresh={closeAddLCAndRefresh}
+        />
+      )}
+      {deleteLifecycleOpen && selectedID && (
+        <DeleteBucketLifecycleRule
+          id={selectedID}
+          bucket={bucketName}
+          deleteOpen={deleteLifecycleOpen}
+          onCloseAndRefresh={closeDelLCRefresh}
         />
       )}
       <Grid container>
@@ -232,7 +308,7 @@ const BucketLifecyclePanel = ({
             errorProps={{ disabled: true }}
           >
             <TableWrapper
-              itemActions={[]}
+              itemActions={lifecycleActions}
               columns={lifecycleColumns}
               isLoading={loadingLifecycle}
               records={lifecycleRecords}
@@ -245,6 +321,7 @@ const BucketLifecyclePanel = ({
         </Grid>
         {!loadingLifecycle && (
           <Grid item xs={12}>
+            <br />
             <HelpBox
               title={"Lifecycle Rules"}
               iconComponent={<TiersIcon />}

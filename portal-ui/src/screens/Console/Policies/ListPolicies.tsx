@@ -43,9 +43,10 @@ import {
   IAM_PAGES,
   IAM_SCOPES,
 } from "../../../common/SecureComponent/permissions";
-import SecureComponent, {
+import {
+  SecureComponent,
   hasPermission,
-} from "../../../common/SecureComponent/SecureComponent";
+} from "../../../common/SecureComponent";
 import SearchBox from "../Common/SearchBox";
 
 import withSuspense from "../Common/Components/withSuspense";
@@ -222,9 +223,6 @@ const ListPolicies = ({ classes, setErrorSnackMessage }: IPoliciesProps) => {
               }}
             />
           </SecureComponent>
-        </Grid>
-        <Grid item xs={12}>
-          <br />
         </Grid>
         <Grid item xs={12} className={classes.tableBlock}>
           <SecureComponent

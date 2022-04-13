@@ -26,7 +26,6 @@ import {
   modalStyleUtils,
 } from "../../../../Common/FormComponents/common/styleLibrary";
 import { connect } from "react-redux";
-import { setFileModeEnabled } from "../../../../ObjectBrowser/actions";
 import history from "../../../../../../history";
 import { decodeFileName, encodeFileName } from "../../../../../../common/utils";
 import { setModalErrorSnackMessage } from "../../../../../../actions";
@@ -38,7 +37,6 @@ interface ICreateFolder {
   modalOpen: boolean;
   bucketName: string;
   folderName: string;
-  setFileModeEnabled: typeof setFileModeEnabled;
   setModalErrorSnackMessage: typeof setModalErrorSnackMessage;
   onClose: () => any;
   existingFiles: BucketObject[];
@@ -55,7 +53,6 @@ const CreateFolderModal = ({
   folderName,
   bucketName,
   onClose,
-  setFileModeEnabled,
   setModalErrorSnackMessage,
   classes,
   existingFiles,
@@ -90,7 +87,6 @@ const CreateFolderModal = ({
       `${folderPath}${pathUrl}`
     )}/`;
     history.push(newPath);
-    setFileModeEnabled(false);
     onClose();
   };
 
@@ -101,6 +97,16 @@ const CreateFolderModal = ({
     }
     setIsFormValid(valid);
   }, [pathUrl]);
+
+  const inputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setPathUrl(e.target.value);
+  };
+
+  const keyPressed = (e: any) => {
+    if (e.code === "Enter" && pathUrl !== "") {
+      createProcess();
+    }
+  };
 
   return (
     <React.Fragment>
@@ -121,9 +127,8 @@ const CreateFolderModal = ({
               id={"folderPath"}
               name={"folderPath"}
               placeholder={"Enter the new Folder Path"}
-              onChange={(e) => {
-                setPathUrl(e.target.value);
-              }}
+              onChange={inputChange}
+              onKeyPress={keyPressed}
               required
             />
           </Grid>
@@ -153,7 +158,6 @@ const CreateFolderModal = ({
 };
 
 const mapDispatchToProps = {
-  setFileModeEnabled,
   setModalErrorSnackMessage,
 };
 

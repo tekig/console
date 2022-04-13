@@ -65,7 +65,7 @@ func TestLogin(t *testing.T) {
 			SignerType:      0,
 		}, nil
 	}
-	token, err := login(consoleCredentials)
+	token, err := login(consoleCredentials, nil)
 	funcAssert.NotEmpty(token, "Token was returned empty")
 	funcAssert.Nil(err, "error creating a session")
 
@@ -73,7 +73,7 @@ func TestLogin(t *testing.T) {
 	consoleCredentialsGetMock = func() (credentials.Value, error) {
 		return credentials.Value{}, errors.New("")
 	}
-	_, err = login(consoleCredentials)
+	_, err = login(consoleCredentials, nil)
 	funcAssert.NotNil(err, "not error returned creating a session")
 }
 
@@ -146,7 +146,7 @@ func Test_validateUserAgainstIDP(t *testing.T) {
 	}
 }
 
-func Test_getAccountPolicy(t *testing.T) {
+func Test_getAccountInfo(t *testing.T) {
 	client := adminClientMock{}
 	type args struct {
 		ctx    context.Context
@@ -160,7 +160,7 @@ func Test_getAccountPolicy(t *testing.T) {
 		mockFunc func()
 	}{
 		{
-			name: "error getting account policy",
+			name: "error getting account info",
 			args: args{
 				ctx:    context.Background(),
 				client: client,
@@ -179,13 +179,15 @@ func Test_getAccountPolicy(t *testing.T) {
 			if tt.mockFunc != nil {
 				tt.mockFunc()
 			}
-			got, err := getAccountPolicy(tt.args.ctx, tt.args.client)
+			got, err := getAccountInfo(tt.args.ctx, tt.args.client)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("getAccountPolicy() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("getAccountInfo() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("getAccountPolicy() got = %v, want %v", got, tt.want)
+			if tt.want != nil {
+				if !reflect.DeepEqual(got, tt.want) {
+					t.Errorf("getAccountInfo() got = %v, want %v", got, tt.want)
+				}
 			}
 		})
 	}

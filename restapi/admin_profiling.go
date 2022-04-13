@@ -48,8 +48,7 @@ func registerProfilingHandler(api *operations.ConsoleAPI) {
 		// HTTP client the name and extension of the file we are returning
 		return middleware.ResponderFunc(func(w http.ResponseWriter, _ runtime.Producer) {
 			defer profilingStopResponse.Close()
-
-			w.Header().Set("Content-Type", "application/octet-stream")
+			w.Header().Set("Content-Type", "application/zip")
 			w.Header().Set("Content-Disposition", "attachment; filename=profile.zip")
 			io.Copy(w, profilingStopResponse)
 		})
@@ -66,7 +65,7 @@ func registerProfilingHandler(api *operations.ConsoleAPI) {
 //		"nodeName": "127.0.0.1:9000"
 //		"error": ""
 //	}
-func startProfiling(ctx context.Context, client MinioAdmin, profilerType models.ProfilerType) ([]*models.StartProfilingItem, error) {
+func startProfiling(ctx context.Context, client MinioAdmin, profilerType string) ([]*models.StartProfilingItem, error) {
 	profilingResults, err := client.startProfiling(ctx, madmin.ProfilerType(profilerType))
 	if err != nil {
 		return nil, err
@@ -84,7 +83,8 @@ func startProfiling(ctx context.Context, client MinioAdmin, profilerType models.
 
 // getProfilingStartResponse performs startProfiling() and serializes it to the handler's output
 func getProfilingStartResponse(session *models.Principal, params *models.ProfilingStartRequest) (*models.StartProfilingList, *models.Error) {
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	if params == nil {
 		return nil, prepareError(errPolicyBodyNotInRequest)
 	}
@@ -109,16 +109,17 @@ func getProfilingStartResponse(session *models.Principal, params *models.Profili
 // stopProfiling() stop the profiling on the Minio server and returns
 // the generated Zip file as io.ReadCloser
 func stopProfiling(ctx context.Context, client MinioAdmin) (io.ReadCloser, error) {
-	profilingData, err := client.stopProfiling(ctx)
+	zippedData, err := client.stopProfiling(ctx)
 	if err != nil {
 		return nil, err
 	}
-	return profilingData, nil
+	return zippedData, nil
 }
 
 // getProfilingStopResponse() performs setPolicy() and serializes it to the handler's output
 func getProfilingStopResponse(session *models.Principal) (io.ReadCloser, *models.Error) {
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	mAdmin, err := NewMinioAdminClient(session)
 	if err != nil {
 		return nil, prepareError(err)

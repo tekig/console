@@ -125,7 +125,7 @@ export interface INodeAffinityTerms {
 }
 
 export interface INodeAffinityLabelsSelector {
-  matchExpressions: object[];
+  matchExpressions: IMatchExpressionItem[];
 }
 
 export interface IMatchExpressionItem {
@@ -134,10 +134,21 @@ export interface IMatchExpressionItem {
   values: string[];
 }
 
+export enum ITolerationEffect {
+  "NoSchedule" = "NoSchedule",
+  "PreferNoSchedule" = "PreferNoSchedule",
+  "NoExecute" = "NoExecute",
+}
+
+export enum ITolerationOperator {
+  "Equal" = "Equal",
+  "Exists" = "Exists",
+}
+
 export interface ITolerationModel {
-  effect: string;
+  effect: ITolerationEffect;
   key: string;
-  operator: string;
+  operator: ITolerationOperator;
   value?: string;
   tolerationSeconds?: ITolerationSeconds;
 }
@@ -178,6 +189,40 @@ export interface IEncryptionConfiguration {
   gemalto?: IGemaltoConfig;
   aws?: IAWSConfig;
   vault?: IVaultConfig;
+  azure?: IAzureConfig;
+  gcp?: IGCPConfig;
+}
+
+export interface IGCPCredentials {
+  client_email: string;
+  client_id: string;
+  private_key_id: string;
+  private_key: string;
+}
+
+export interface IGCPSecretManager {
+  project_id: string;
+  endpoint?: string;
+  credentials?: IGCPCredentials;
+}
+
+export interface IGCPConfig {
+  secretmanager: IGCPSecretManager;
+}
+
+export interface IAzureCredentials {
+  tenant_id: string;
+  client_id: string;
+  client_secret: string;
+}
+
+export interface IAzureKeyVault {
+  endpoint: string;
+  credentials?: IAzureCredentials;
+}
+
+export interface IAzureConfig {
+  keyvault: IAzureKeyVault;
 }
 
 export interface IVaultConfig {
@@ -218,16 +263,16 @@ export interface IVaultStatusConfig {
 export interface IKeysecureConfig {
   endpoint: string;
   credentials: IGemaltoCredentials;
-  tls: IGemaltoTLS;
+  tls: IGemaltoTLSConfig;
 }
 
 export interface IGemaltoCredentials {
   token: string;
   domain: string;
-  retry?: number;
+  retry?: string;
 }
 
-export interface IGemaltoTLS {
+export interface IGemaltoTLSConfig {
   ca: string;
 }
 

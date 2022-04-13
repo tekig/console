@@ -53,6 +53,50 @@ export const bucketWrite = Role(
   { preserveUrl: true }
 );
 
+export const bucketReadWrite = Role(
+  loginUrl,
+  async (t) => {
+    await t
+      .typeText("#accessKey", "bucketreadwrite-" + unixTimestamp)
+      .typeText("#secretKey", "bucketreadwrite")
+      .click(submitButton);
+  },
+  { preserveUrl: true }
+);
+
+export const bucketObjectTags = Role(
+  loginUrl,
+  async (t) => {
+    await t
+      .typeText("#accessKey", "bucketobjecttags-" + unixTimestamp)
+      .typeText("#secretKey", "bucketobjecttags")
+      .click(submitButton);
+  },
+  { preserveUrl: true }
+);
+
+export const bucketCannotTag = Role(
+  loginUrl,
+  async (t) => {
+    await t
+      .typeText("#accessKey", "bucketcannottag-" + unixTimestamp)
+      .typeText("#secretKey", "bucketcannottag")
+      .click(submitButton);
+  },
+  { preserveUrl: true }
+);
+
+export const bucketSpecific = Role(
+  loginUrl,
+  async (t) => {
+    await t
+      .typeText("#accessKey", "bucketspecific-" + unixTimestamp)
+      .typeText("#secretKey", "bucketspecific")
+      .click(submitButton);
+  },
+  { preserveUrl: true }
+);
+
 export const bucketWritePrefixOnly = Role(
   loginUrl,
   async (t) => {
@@ -191,6 +235,17 @@ export const watch = Role(
     await t
       .typeText("#accessKey", "watch-" + unixTimestamp)
       .typeText("#secretKey", "watch1234")
+      .click(submitButton);
+  },
+  { preserveUrl: true }
+);
+
+export const deleteObjectWithPrefixOnly = Role(
+  loginUrl,
+  async (t) => {
+    await t
+      .typeText("#accessKey", "delete-object-with-prefix-" + unixTimestamp)
+      .typeText("#secretKey", "deleteobjectwithprefix1234")
       .click(submitButton);
   },
   { preserveUrl: true }

@@ -19,7 +19,7 @@ securityDefinitions:
     tokenUrl: http://min.io
 # Apply the key security definition to all APIs
 security:
-  - key: []
+  - key: [ ]
 paths:
   /login:
     get:
@@ -35,7 +35,7 @@ paths:
           schema:
             $ref: "#/definitions/error"
       # Exclude this API from the authentication requirement
-      security: []
+      security: [ ]
       tags:
         - UserAPI
   /login/operator:
@@ -55,7 +55,7 @@ paths:
           description: Generic error response.
           schema:
             $ref: "#/definitions/error"
-      security: []
+      security: [ ]
       tags:
         - UserAPI
 
@@ -76,7 +76,7 @@ paths:
           description: Generic error response.
           schema:
             $ref: "#/definitions/error"
-      security: []
+      security: [ ]
       tags:
         - UserAPI
 
@@ -107,6 +107,23 @@ paths:
           description: Generic error response.
           schema:
             $ref: "#/definitions/error"
+      tags:
+        - UserAPI
+
+  /check-version:
+    get:
+      summary: Checks the current Operator version against the latest
+      operationId: CheckMinIOVersion”
+      responses:
+        200:
+          description: A successful response.
+          schema:
+            $ref: "#/definitions/checkOperatorVersionResponse"
+        default:
+          description: Generic error response.
+          schema:
+            $ref: "#/definitions/error"
+      security: [ ]
       tags:
         - UserAPI
 
@@ -286,6 +303,57 @@ paths:
           description: A successful response.
           schema:
             $ref: "#/definitions/listTenantsResponse"
+        default:
+          description: Generic error response.
+          schema:
+            $ref: "#/definitions/error"
+      tags:
+        - OperatorAPI
+
+  /namespaces/{namespace}/tenants/{tenant}/identity-provider:
+    get:
+      summary: Tenant Identity Provider
+      operationId: TenantIdentityProvider
+      parameters:
+        - name: namespace
+          in: path
+          required: true
+          type: string
+        - name: tenant
+          in: path
+          required: true
+          type: string
+      responses:
+        200:
+          description: A successful response.
+          schema:
+            $ref: "#/definitions/idpConfiguration"
+        default:
+          description: Generic error response.
+          schema:
+            $ref: "#/definitions/error"
+      tags:
+        - OperatorAPI
+    post:
+      summary: Update Tenant Identity Provider
+      operationId: UpdateTenantIdentityProvider
+      parameters:
+        - name: namespace
+          in: path
+          required: true
+          type: string
+        - name: tenant
+          in: path
+          required: true
+          type: string
+        - name: body
+          in: body
+          required: true
+          schema:
+            $ref: "#/definitions/idpConfiguration"
+      responses:
+        204:
+          description: A successful response.
         default:
           description: Generic error response.
           schema:
@@ -657,6 +725,31 @@ paths:
       tags:
         - OperatorAPI
 
+  /namespaces/{namespace}/tenants/{tenant}/events:
+    get:
+      summary: Get Events for given Tenant
+      operationId: GetTenantEvents
+      parameters:
+        - name: namespace
+          in: path
+          required: true
+          type: string
+        - name: tenant
+          in: path
+          required: true
+          type: string
+      responses:
+        200:
+          description: A successful response.
+          schema:
+            $ref: "#/definitions/eventListWrapper"
+        default:
+          description: Generic error response.
+          schema:
+            $ref: "#/definitions/error"
+      tags:
+        - OperatorAPI
+
   /namespaces/{namespace}/tenants/{tenant}/pods/{podName}:
     get:
       summary: Get Logs for Pod
@@ -756,13 +849,13 @@ paths:
         200:
           description: A successful response.
           schema:
-              $ref: "#/definitions/tenantMonitoringInfo"
+            $ref: "#/definitions/tenantMonitoringInfo"
         default:
           description: Generic error response.
           schema:
             $ref: "#/definitions/error"
       tags:
-        - OperatorAPI 
+        - OperatorAPI
     put:
       summary: Set Prometheus monitoring fields for tenant
       operationId: SetTenantMonitoring
@@ -788,7 +881,7 @@ paths:
           schema:
             $ref: "#/definitions/error"
       tags:
-        - OperatorAPI        
+        - OperatorAPI
 
   /namespaces/{namespace}/tenants/{tenant}/certificates:
     put:
@@ -819,6 +912,27 @@ paths:
         - OperatorAPI
 
   /namespaces/{namespace}/tenants/{tenant}/encryption:
+    delete:
+      summary: Tenant Delete Encryption
+      operationId: TenantDeleteEncryption
+      parameters:
+        - name: namespace
+          in: path
+          required: true
+          type: string
+        - name: tenant
+          in: path
+          required: true
+          type: string
+      responses:
+        204:
+          description: A successful response.
+        default:
+          description: Generic error response.
+          schema:
+            $ref: "#/definitions/error"
+      tags:
+        - OperatorAPI
     put:
       summary: Tenant Update Encryption
       operationId: TenantUpdateEncryption
@@ -839,6 +953,30 @@ paths:
       responses:
         201:
           description: A successful response.
+        default:
+          description: Generic error response.
+          schema:
+            $ref: "#/definitions/error"
+      tags:
+        - OperatorAPI
+
+    get:
+      summary: Tenant Encryption Info
+      operationId: TenantEncryptionInfo
+      parameters:
+        - name: namespace
+          in: path
+          required: true
+          type: string
+        - name: tenant
+          in: path
+          required: true
+          type: string
+      responses:
+        200:
+          description: A successful response.
+          schema:
+            $ref: "#/definitions/encryptionConfigurationResponse"
         default:
           description: Generic error response.
           schema:
@@ -995,78 +1133,6 @@ paths:
       tags:
         - OperatorAPI
 
-  /direct-csi/drives:
-    get:
-      summary: Get direct-csi drives list
-      operationId: GetDirectCSIDriveList
-      parameters:
-        - name: nodes
-          in: query
-          required: false
-          type: string
-        - name: drives
-          in: query
-          required: false
-          type: string
-      responses:
-        200:
-          description: A successful response.
-          schema:
-            $ref: "#/definitions/getDirectCSIDriveListResponse"
-        default:
-          description: Generic error response.
-          schema:
-            $ref: "#/definitions/error"
-      tags:
-        - OperatorAPI
-
-  /direct-csi/volumes:
-    get:
-      summary: Get direct-csi volumes list
-      operationId: GetDirectCSIVolumeList
-      parameters:
-        - name: nodes
-          in: query
-          required: false
-          type: string
-        - name: drives
-          in: query
-          required: false
-          type: string
-      responses:
-        200:
-          description: A successful response.
-          schema:
-            $ref: "#/definitions/getDirectCSIVolumeListResponse"
-        default:
-          description: Generic error response.
-          schema:
-            $ref: "#/definitions/error"
-      tags:
-        - OperatorAPI
-
-  /direct-csi/drives/format:
-    post:
-      summary: Format direct-csi drives from a list
-      operationId: DirectCSIFormatDrive
-      parameters:
-        - name: body
-          in: body
-          required: true
-          schema:
-            $ref: "#/definitions/formatConfiguration"
-      responses:
-        200:
-          description: A successful response.
-          schema:
-            $ref: "#/definitions/formatDirectCSIDrivesResponse"
-        default:
-          description: Generic error response.
-          schema:
-            $ref: "#/definitions/error"
-      tags:
-        - OperatorAPI
-
   /list-pvcs:
     get:
       summary: List all PVCs from namespaces that the user has access to
@@ -1174,7 +1240,7 @@ definitions:
     properties:
       loginStrategy:
         type: string
-        enum: [form, redirect, service-account]
+        enum: [ form, redirect, service-account ]
       redirect:
         type: string
   loginRequest:
@@ -1187,6 +1253,11 @@ definitions:
         type: string
       secretKey:
         type: string
+      features:
+        type: object
+        properties:
+          hide_menu:
+            type: boolean
   loginOauth2AuthRequest:
     type: object
     required:
@@ -1213,7 +1284,7 @@ definitions:
           type: string
       status:
         type: string
-        enum: [ok]
+        enum: [ ok ]
       operator:
         type: boolean
       permissions:
@@ -1255,6 +1326,7 @@ definitions:
           capacity_usage:
             type: integer
             format: int64
+
   tenantSecurityResponse:
     type: object
     properties:
@@ -1400,6 +1472,10 @@ definitions:
       capacity_usage:
         type: integer
         format: int64
+      tiers:
+        type: array
+        items:
+          $ref: "#/definitions/tenantTierElement"
 
   listTenantsResponse:
     type: object
@@ -1623,18 +1699,13 @@ definitions:
         type: object
         required:
           - url
+          - lookup_bind_dn
         properties:
           url:
-            type: string
-          username_format:
-            type: string
-          username_search_filter:
             type: string
           group_search_base_dn:
             type: string
           group_search_filter:
-            type: string
-          group_name_attribute:
             type: string
           skip_tls_verification:
             type: boolean
@@ -1664,6 +1735,10 @@ definitions:
             type: string
           replicas:
             type: string
+          secretsToBeDeleted:
+            type: array
+            items:
+              type: string
           server:
             type: object
             $ref: "#/definitions/keyPairConfiguration"
@@ -1679,6 +1754,40 @@ definitions:
           vault:
             type: object
             $ref: "#/definitions/vaultConfiguration"
+          gcp:
+            type: object
+            $ref: "#/definitions/gcpConfiguration"
+          azure:
+            type: object
+            $ref: "#/definitions/azureConfiguration"
+          securityContext:
+            type: object
+            $ref: "#/definitions/securityContext"
+
+  encryptionConfigurationResponse:
+    allOf:
+      - $ref: "#/definitions/metadataFields"
+      - type: object
+        properties:
+          image:
+            type: string
+          replicas:
+            type: string
+          server:
+            type: object
+            $ref: "#/definitions/certificateInfo"
+          mtls_client:
+            type: object
+            $ref: "#/definitions/certificateInfo"
+          gemalto:
+            type: object
+            $ref: "#/definitions/gemaltoConfigurationResponse"
+          aws:
+            type: object
+            $ref: "#/definitions/awsConfiguration"
+          vault:
+            type: object
+            $ref: "#/definitions/vaultConfigurationResponse"
           gcp:
             type: object
             $ref: "#/definitions/gcpConfiguration"
@@ -1733,6 +1842,51 @@ definitions:
             type: string
           ca:
             type: string
+
+  vaultConfigurationResponse:
+    type: object
+    required:
+      - endpoint
+      - approle
+    properties:
+      endpoint:
+        type: string
+      engine:
+        type: string
+      namespace:
+        type: string
+      prefix:
+        type: string
+      approle:
+        type: object
+        required:
+          - id
+          - secret
+        properties:
+          engine:
+            type: string
+          id:
+            type: string
+          secret:
+            type: string
+          retry:
+            type: integer
+            format: int64
+      status:
+        type: object
+        properties:
+          ping:
+            type: integer
+            format: int64
+      tls:
+        type: object
+        properties:
+          crt:
+            type: object
+            $ref: "#/definitions/certificateInfo"
+          ca:
+            type: object
+            $ref: "#/definitions/certificateInfo"
 
   awsConfiguration:
     type: object
@@ -1798,6 +1952,41 @@ definitions:
             properties:
               ca:
                 type: string
+
+  gemaltoConfigurationResponse:
+    type: object
+    required:
+      - keysecure
+    properties:
+      keysecure:
+        type: object
+        required:
+          - endpoint
+          - credentials
+        properties:
+          endpoint:
+            type: string
+          credentials:
+            type: object
+            required:
+              - token
+              - domain
+            properties:
+              token:
+                type: string
+              domain:
+                type: string
+              retry:
+                type: integer
+                format: int64
+          tls:
+            type: object
+            required:
+              - ca
+            properties:
+              ca:
+                type: object
+                $ref: "#/definitions/certificateInfo"
 
   gcpConfiguration:
     type: object
@@ -1867,6 +2056,8 @@ definitions:
       access_key:
         type: string
       secret_key:
+        type: string
+      url:
         type: string
 
   tenantPod:
@@ -2524,12 +2715,12 @@ definitions:
       logCPURequest:
         type: string
       logMemRequest:
-        type: string 
+        type: string
       logDBCPURequest:
         type: string
       logDBMemRequest:
-        type: string    
-     
+        type: string
+
 
   listPVCsResponse:
     type: object
@@ -2595,14 +2786,14 @@ definitions:
         type: string
       message:
         type: string
-        
+
   tenantMonitoringInfo:
     type: object
     properties:
       prometheusEnabled:
-        type: boolean 
+        type: boolean
       toggle:
-        type: boolean  
+        type: boolean
       image:
         type: string
       sidecarImage:
@@ -2624,14 +2815,14 @@ definitions:
         items:
           $ref: "#/definitions/nodeSelector"
       serviceAccountName:
-        type: string  
+        type: string
       storageClassName:
-        type: string    
+        type: string
       monitoringCPURequest:
-        type: string       
+        type: string
       monitoringMemRequest:
-        type: string          
- 
+        type: string
+
   label:
     type: object
     properties:
@@ -2647,7 +2838,7 @@ definitions:
         type: string
       value:
         type: string
-        
+
   nodeSelector:
     type: object
     properties:
@@ -2660,7 +2851,7 @@ definitions:
     type: object
     properties:
       prometheusEnabled:
-        type: boolean    
+        type: boolean
 
   formatConfiguration:
     type: object
@@ -2715,26 +2906,22 @@ definitions:
       max_allocatable_mem:
         type: integer
         format: int64
-  label:
+
+  checkOperatorVersionResponse:
     type: object
     properties:
-      key:
+      current_version:
         type: string
-      value:
+      latest_version:
         type: string
 
-  annotation:
+  tenantTierElement:
     type: object
     properties:
-      key:
+      name:
         type: string
-      value:
+      type:
         type: string
-
-  nodeSelector:
-    type: object
-    properties:
-      key:
-        type: string
-      value:
-        type: string
+      size:
+        type: integer
+        format: int64

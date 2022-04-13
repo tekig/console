@@ -17,20 +17,15 @@
 package cluster
 
 import (
-	"errors"
-	"fmt"
 	"io/ioutil"
 	"net"
 	"net/http"
-	"regexp"
 	"strings"
 	"time"
 
-	"github.com/minio/pkg/env"
-)
+	"github.com/minio/console/pkg/utils"
 
-var (
-	errCantDetermineMinIOImage = errors.New("can't determine MinIO Image")
+	"github.com/minio/pkg/env"
 )
 
 func GetK8sAPIServer() string {
@@ -63,39 +58,6 @@ func GetNsFromFile() string {
 	return string(dat)
 }
 
-// Namespace will run only once at console startup
-var Namespace = GetNsFromFile()
-
-// getLatestMinIOImage returns the latest docker image for MinIO if found on the internet
-func getLatestMinIOImage(client HTTPClientI) (*string, error) {
-	resp, err := client.Get("https://dl.min.io/server/minio/release/linux-amd64/")
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-	var re = regexp.MustCompile(`(?m)\.\/minio\.(RELEASE.*?Z)"`)
-	// look for a single match
-	matches := re.FindAllStringSubmatch(string(body), 1)
-	for i := range matches {
-		release := matches[i][1]
-		dockerImage := fmt.Sprintf("minio/minio:%s", release)
-		return &dockerImage, nil
-	}
-	return nil, errCantDetermineMinIOImage
-}
-
-var latestMinIOImage, errLatestMinIOImage = getLatestMinIOImage(
-	&HTTPClient{
-		Client: &http.Client{
-			Timeout: 15 * time.Second,
-		},
-	})
-
 // GetMinioImage returns the image URL to be used when deploying a MinIO instance, if there is
 // a preferred image to be used (configured via ENVIRONMENT VARIABLES) GetMinioImage will return that
 // if not, GetMinioImage will try to obtain the image URL for the latest version of MinIO and return that
@@ -105,17 +67,15 @@ func GetMinioImage() (*string, error) {
 	if image != "" {
 		return &image, nil
 	}
+	latestMinIOImage, errLatestMinIOImage := utils.GetLatestMinIOImage(
+		&utils.HTTPClient{
+			Client: &http.Client{
+				Timeout: 5 * time.Second,
+			},
+		})
+
 	if errLatestMinIOImage != nil {
 		return nil, errLatestMinIOImage
-	}
-	return latestMinIOImage, nil
-}
-
-// GetLatestMinioImage returns the latest image URL on minio repository
-func GetLatestMinioImage(client HTTPClientI) (*string, error) {
-	latestMinIOImage, err := getLatestMinIOImage(client)
-	if err != nil {
-		return nil, err
 	}
 	return latestMinIOImage, nil
 }

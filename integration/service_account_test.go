@@ -25,6 +25,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-openapi/swag"
+
 	iampolicy "github.com/minio/pkg/iam/policy"
 	"github.com/stretchr/testify/assert"
 )
@@ -46,28 +48,11 @@ func TestAddServiceAccount(t *testing.T) {
 	}
 
 	// Add service account
-	fmt.Println(".......................TestServiceAccountPolicy(): Create Data to add user")
 	requestDataAddServiceAccount := map[string]interface{}{
 		"accessKey": "testuser1",
 		"secretKey": "password",
-		"policy": "{" +
-			"\n    \"Version\": \"2012-10-17\"," +
-			"\n    \"Statement\": [" +
-			"\n        {" +
-			"\n            \"Effect\": \"Allow\"," +
-			"\n            \"Action\": [" +
-			"\n                \"s3:GetBucketLocation\"," +
-			"\n                \"s3:GetObject\"" +
-			"\n            ]," +
-			"\n            \"Resource\": [" +
-			"\n                \"arn:aws:s3:::*\"" +
-			"\n            ]" +
-			"\n        }" +
-			"\n    ]" +
-			"\n}",
 	}
 
-	fmt.Println("..............................TestServiceAccountPolicy(): Prepare the POST")
 	requestDataJSON, _ := json.Marshal(requestDataAddServiceAccount)
 	requestDataBody := bytes.NewReader(requestDataJSON)
 	request, err := http.NewRequest(
@@ -79,26 +64,54 @@ func TestAddServiceAccount(t *testing.T) {
 	request.Header.Add("Cookie", fmt.Sprintf("token=%s", token))
 	request.Header.Add("Content-Type", "application/json")
 
-	fmt.Println(".................................TestServiceAccountPolicy(): Make the POST")
 	response, err := client.Do(request)
 	if err != nil {
 		log.Println(err)
 		return
 	}
-	fmt.Println("..................................TestServiceAccountPolicy(): Verification")
-	fmt.Println(".................................TestServiceAccountPolicy(): POST response")
-	fmt.Println(response)
-	fmt.Println("....................................TestServiceAccountPolicy(): POST error")
-	fmt.Println(err)
 	if response != nil {
 		fmt.Println("POST StatusCode:", response.StatusCode)
 		assert.Equal(201, response.StatusCode, "Status Code is incorrect")
 	}
 
-	fmt.Println("...................................TestServiceAccountPolicy(): Remove user")
+	requestDataPolicy := map[string]interface{}{"policy": `
+  {
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetBucketLocation",
+        "s3:GetObject"
+      ],
+      "Resource": [
+        "arn:aws:s3:::*"
+      ]
+    }
+  ]
+}`,
+	}
+	requestDataJSON, _ = json.Marshal(requestDataPolicy)
+	requestDataBody = bytes.NewReader(requestDataJSON)
+	request, err = http.NewRequest(
+		"PUT", "http://localhost:9090/api/v1/service-accounts/testuser1/policy", requestDataBody)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	request.Header.Add("Cookie", fmt.Sprintf("token=%s", token))
+	request.Header.Add("Content-Type", "application/json")
+	response, err = client.Do(request)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	if response != nil {
+		fmt.Println("POST StatusCode:", response.StatusCode)
+		assert.Equal(200, response.StatusCode, "Status Code is incorrect")
+	}
 
 	// Test policy
-	fmt.Println(".......................TestAddUserServiceAccount(): Create Data to add user")
 	request, err = http.NewRequest(
 		"GET", "http://localhost:9090/api/v1/service-accounts/testuser1/policy", nil)
 	if err != nil {
@@ -107,18 +120,11 @@ func TestAddServiceAccount(t *testing.T) {
 	}
 	request.Header.Add("Cookie", fmt.Sprintf("token=%s", token))
 	request.Header.Add("Content-Type", "application/json")
-
-	fmt.Println(".................................TestAddServiceAccount(): Make the POST")
 	response, err = client.Do(request)
 	if err != nil {
 		log.Println(err)
 		return
 	}
-	fmt.Println("..................................TestAddServiceAccount(): Verification")
-	fmt.Println(".................................TestAddServiceAccount(): POST response")
-	fmt.Println(response)
-	fmt.Println("....................................TestAddServiceAccount(): POST error")
-	fmt.Println(err)
 	if response != nil {
 		fmt.Println("POST StatusCode:", response.StatusCode)
 		assert.Equal(200, response.StatusCode, "Status Code is incorrect")
@@ -136,8 +142,6 @@ func TestAddServiceAccount(t *testing.T) {
 		assert.Equal(expected, actual)
 	}
 
-	fmt.Println("...................................TestServiceAccountPolicy(): Remove service account")
-
 	// {{baseUrl}}/user?name=proident velit
 	// Investiga como se borra en el browser.
 	request, err = http.NewRequest(
@@ -148,21 +152,258 @@ func TestAddServiceAccount(t *testing.T) {
 	}
 	request.Header.Add("Cookie", fmt.Sprintf("token=%s", token))
 	request.Header.Add("Content-Type", "application/json")
-
-	fmt.Println("...............................TestServiceAccountPolicy(): Make the DELETE")
 	response, err = client.Do(request)
 	if err != nil {
 		log.Println(err)
 		return
 	}
-	fmt.Println("..................................TestServiceAccountPolicy(): Verification")
-	fmt.Println("...............................TestServiceAccountPolicy(): DELETE response")
-	fmt.Println(response)
-	fmt.Println("..................................TestServiceAccountPolicy(): DELETE error")
-	fmt.Println(err)
 	if response != nil {
 		fmt.Println("DELETE StatusCode:", response.StatusCode)
 		assert.Equal(204, response.StatusCode, "has to be 204 when delete user")
+	}
+
+}
+
+func Test_ServiceAccountsAPI(t *testing.T) {
+	assert := assert.New(t)
+
+	type args struct {
+		api    string
+		policy *string
+	}
+	tests := []struct {
+		name           string
+		args           args
+		expectedStatus int
+		expectedError  error
+	}{
+		{
+			name: "Create Service Account - Default",
+			args: args{
+				api:    "/service-accounts",
+				policy: nil,
+			},
+			expectedStatus: 201,
+			expectedError:  nil,
+		},
+		{
+			name: "Create Service Account - Valid Policy",
+			args: args{
+				api: "/service-accounts",
+				policy: swag.String(`
+  {
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetBucketLocation",
+        "s3:GetObject"
+      ],
+      "Resource": [
+        "arn:aws:s3:::*"
+      ]
+    }
+  ]
+}`),
+			},
+			expectedStatus: 201,
+			expectedError:  nil,
+		},
+		{
+			name: "Create Service Account - Invalid Policy",
+			args: args{
+				api: "/service-accounts",
+				policy: swag.String(`
+  {
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetBucketLocation"
+        "s3:GetObject"
+      ],
+      "Resource": [
+        "arn:aws:s3:::*"
+      ]
+    }
+  ]
+}`),
+			},
+			expectedStatus: 500,
+			expectedError:  nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+
+			client := &http.Client{
+				Timeout: 3 * time.Second,
+			}
+
+			// Add service account
+
+			requestDataPolicy := map[string]interface{}{}
+			if tt.args.policy != nil {
+				requestDataPolicy["policy"] = *tt.args.policy
+			}
+
+			requestDataJSON, _ := json.Marshal(requestDataPolicy)
+			requestDataBody := bytes.NewReader(requestDataJSON)
+			request, err := http.NewRequest(
+				"POST", fmt.Sprintf("http://localhost:9090/api/v1%s", tt.args.api), requestDataBody)
+			if err != nil {
+				log.Println(err)
+				return
+			}
+			request.Header.Add("Cookie", fmt.Sprintf("token=%s", token))
+			request.Header.Add("Content-Type", "application/json")
+			response, err := client.Do(request)
+			if err != nil {
+				log.Println(err)
+				return
+			}
+			if response != nil {
+				assert.Equal(tt.expectedStatus, response.StatusCode, "Status Code is incorrect")
+			}
+
+		})
+	}
+
+}
+
+func DeleteMultipleServiceAccounts(serviceAccounts []string) (*http.Response, error) {
+	/*
+		Helper function to delete multiple service accounts
+		URL: http://localhost:9001/api/v1/service-accounts/delete-multi
+		HTTP Verb: DELETE
+		Data: ["U3RADB7J2ZZHELR0WSBB","ZE8H1HYOA6AVGKFCV6YU"]
+		Response: Status Code: 204 No Content
+	*/
+	client := &http.Client{
+		Timeout: 3 * time.Second,
+	}
+	requestDataJSON, _ := json.Marshal(serviceAccounts)
+	requestDataBody := bytes.NewReader(requestDataJSON)
+	request, err := http.NewRequest(
+		"DELETE", "http://localhost:9090/api/v1/service-accounts/delete-multi", requestDataBody)
+	if err != nil {
+		log.Println(err)
+	}
+	request.Header.Add("Cookie", fmt.Sprintf("token=%s", token))
+	request.Header.Add("Content-Type", "application/json")
+	response, err := client.Do(request)
+	return response, err
+}
+
+func TestCreateServiceAccountForUserWithCredentials(t *testing.T) {
+	/*
+		To test creation of service account for a user.
+	*/
+
+	// Test's variables
+	userName := "testcreateserviceaccountforuserwithcredentials1"
+	assert := assert.New(t)
+	policy := ""
+	serviceAccountLengthInBytes := 40 // As observed, update as needed
+
+	// 1. Create the user
+	var groups = []string{}
+	var policies = []string{}
+	var secretKey = "testcreateserviceaccountforuserwithcrede"
+	response, err := AddUser(userName, "secretKey", groups, policies)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	if response != nil {
+		fmt.Println("StatusCode:", response.StatusCode)
+		assert.Equal(201, response.StatusCode, "Status Code is incorrect")
+	}
+
+	// Table driven testing part
+	type args struct {
+		accessKey string
+	}
+	tests := []struct {
+		name           string
+		args           args
+		expectedStatus int
+	}{
+		{
+			name:           "Service Account With Valid Credentials",
+			expectedStatus: 201,
+			args: args{
+				accessKey: "testcreateserviceacc",
+			},
+		},
+		{
+			name:           "Service Account With Invalid Credentials",
+			expectedStatus: 500,
+			args: args{
+				accessKey: "tooooooooooooooooooooolongggggggggggggggggg",
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// 2. Create the service account for the user
+			createServiceAccountWithCredentialsResponse,
+				createServiceAccountWithCredentialsError := CreateServiceAccountForUserWithCredentials(
+				userName,
+				policy,
+				tt.args.accessKey,
+				secretKey,
+			)
+			if createServiceAccountWithCredentialsError != nil {
+				log.Println(createServiceAccountWithCredentialsError)
+				assert.Fail("Error in createServiceAccountWithCredentialsError")
+			}
+			if createServiceAccountWithCredentialsResponse != nil {
+				fmt.Println("StatusCode:", createServiceAccountWithCredentialsResponse.StatusCode)
+				assert.Equal(
+					tt.expectedStatus, // different status expected per table's row
+					createServiceAccountWithCredentialsResponse.StatusCode,
+					inspectHTTPResponse(createServiceAccountWithCredentialsResponse),
+				)
+			}
+
+			// 3. Verify the service account for the user
+			listOfAccountsResponse,
+				listOfAccountsError := ReturnsAListOfServiceAccountsForAUser(userName)
+			if listOfAccountsError != nil {
+				log.Println(listOfAccountsError)
+				assert.Fail("Error in listOfAccountsError")
+			}
+			finalResponse := inspectHTTPResponse(listOfAccountsResponse)
+			if listOfAccountsResponse != nil {
+				fmt.Println("StatusCode:", listOfAccountsResponse.StatusCode)
+				assert.Equal(
+					200, listOfAccountsResponse.StatusCode,
+					finalResponse,
+				)
+			}
+			assert.Equal(len(finalResponse), serviceAccountLengthInBytes, finalResponse)
+		})
+	}
+
+	// Delete Multiple Service Accounts
+	serviceAccount := make([]string, 1)
+	serviceAccount[0] = "testcreateserviceacc"
+	response, err = DeleteMultipleServiceAccounts(serviceAccount)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	if response != nil {
+		fmt.Println("StatusCode:", response.StatusCode)
+		assert.Equal(
+			204,
+			response.StatusCode,
+			inspectHTTPResponse(response),
+		)
 	}
 
 }

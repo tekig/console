@@ -14,35 +14,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// hasAccessToResource receives a list of user permissions to perform on a specific resource, then compares those permissions against
-// a list of required permissions and return true or false depending of the level of required access (match all permissions,
-// match some of the permissions)
-export const hasAccessToResource = (
-  userPermissionsOnBucket: string[] | null | undefined,
-  requiredPermissions: string[] = [],
-  matchAll?: boolean
-) => {
-  if (!userPermissionsOnBucket) {
-    return false;
-  }
-
-  const s3All = userPermissionsOnBucket.includes(IAM_SCOPES.S3_ALL_ACTIONS);
-  const AdminAll = userPermissionsOnBucket.includes(
-    IAM_SCOPES.ADMIN_ALL_ACTIONS
-  );
-
-  const permissions = requiredPermissions.filter(function (n) {
-    return (
-      userPermissionsOnBucket.indexOf(n) !== -1 ||
-      (n.indexOf("s3:") !== -1 && s3All) ||
-      (n.indexOf("admin:") !== -1 && AdminAll)
-    );
-  });
-  return matchAll
-    ? permissions.length === requiredPermissions.length
-    : permissions.length > 0;
-};
-
 export const IAM_ROLES = {
   BUCKET_OWNER: "BUCKET_OWNER", // upload/delete objects from the bucket
   BUCKET_VIEWER: "BUCKET_VIEWER", // only view objects on the bucket
@@ -134,6 +105,7 @@ export const IAM_SCOPES = {
   ADMIN_SERVER_TRACE: "admin:ServerTrace",
   ADMIN_HEALTH_INFO: "admin:OBDInfo",
   ADMIN_HEAL: "admin:Heal",
+  ADMIN_INSPECT_DATA: "admin:InspectData",
   S3_ALL_ACTIONS: "s3:*",
   ADMIN_ALL_ACTIONS: "admin:*",
 };
@@ -158,10 +130,10 @@ export const IAM_PAGES = {
   TOOLS_LOGS: "/tools/logs",
   TOOLS_AUDITLOGS: "/tools/audit-logs",
   TOOLS_TRACE: "/tools/trace",
-  METRICS: "/tools/metrics",
-  DASHBOARD: "/tools/dashboard",
+  DASHBOARD: "/tools/metrics",
   TOOLS_HEAL: "/tools/heal",
   TOOLS_WATCH: "/tools/watch",
+
   /* Health */
   HEALTH: "/health",
 
@@ -172,6 +144,7 @@ export const IAM_PAGES = {
   TOOLS_SPEEDTEST: "/support/speedtest",
   CALL_HOME: "/support/call-home",
   PROFILE: "/support/profile",
+  SUPPORT_INSPECT: "/support/inspect",
 
   /** License **/
   LICENSE: "/license",
@@ -188,13 +161,11 @@ export const IAM_PAGES = {
   TIERS: "/settings/tiers",
   TIERS_ADD: "/settings/tiers/add",
   TIERS_ADD_SERVICE: "/settings/tiers/add/:service",
+  SITE_REPLICATION: "/settings/site-replication",
 
   /* Operator */
   TENANTS: "/tenants",
   TENANTS_ADD: "/tenants/add",
-  STORAGE: "/storage",
-  STORAGE_VOLUMES: "/storage/volumes",
-  STORAGE_DRIVES: "/storage/drives",
   NAMESPACE_TENANT: "/namespaces/:tenantNamespace/tenants/:tenantName",
   NAMESPACE_TENANT_HOP: "/namespaces/:tenantNamespace/tenants/:tenantName/hop",
   NAMESPACE_TENANT_PODS:
@@ -207,18 +178,30 @@ export const IAM_PAGES = {
     "/namespaces/:tenantNamespace/tenants/:tenantName/summary",
   NAMESPACE_TENANT_METRICS:
     "/namespaces/:tenantNamespace/tenants/:tenantName/metrics",
+  NAMESPACE_TENANT_TRACE:
+    "/namespaces/:tenantNamespace/tenants/:tenantName/trace",
   NAMESPACE_TENANT_POOLS:
     "/namespaces/:tenantNamespace/tenants/:tenantName/pools",
+  NAMESPACE_TENANT_POOLS_ADD:
+    "/namespaces/:tenantNamespace/tenants/:tenantName/add-pool",
+  NAMESPACE_TENANT_POOLS_EDIT:
+    "/namespaces/:tenantNamespace/tenants/:tenantName/edit-pool",
   NAMESPACE_TENANT_VOLUMES:
     "/namespaces/:tenantNamespace/tenants/:tenantName/volumes",
   NAMESPACE_TENANT_LICENSE:
     "/namespaces/:tenantNamespace/tenants/:tenantName/license",
+  NAMESPACE_TENANT_IDENTITY_PROVIDER:
+    "/namespaces/:tenantNamespace/tenants/:tenantName/identity-provider",
   NAMESPACE_TENANT_SECURITY:
     "/namespaces/:tenantNamespace/tenants/:tenantName/security",
+  NAMESPACE_TENANT_ENCRYPTION:
+    "/namespaces/:tenantNamespace/tenants/:tenantName/encryption",
   NAMESPACE_TENANT_MONITORING:
     "/namespaces/:tenantNamespace/tenants/:tenantName/monitoring",
   NAMESPACE_TENANT_LOGGING:
     "/namespaces/:tenantNamespace/tenants/:tenantName/logging",
+  NAMESPACE_TENANT_EVENTS:
+    "/namespaces/:tenantNamespace/tenants/:tenantName/events",
 };
 
 // roles
@@ -324,9 +307,6 @@ export const IAM_PAGES_PERMISSIONS = {
   [IAM_PAGES.DASHBOARD]: [
     IAM_SCOPES.ADMIN_SERVER_INFO, // displays dashboard information
   ],
-  [IAM_PAGES.METRICS]: [
-    IAM_SCOPES.ADMIN_SERVER_INFO, // displays dashboard information
-  ],
   [IAM_PAGES.POLICIES_VIEW]: [
     IAM_SCOPES.ADMIN_DELETE_POLICY,
     IAM_SCOPES.ADMIN_LIST_GROUPS,
@@ -395,7 +375,12 @@ export const IAM_PAGES_PERMISSIONS = {
   [IAM_PAGES.CALL_HOME]: [IAM_SCOPES.ADMIN_HEALTH_INFO],
   [IAM_PAGES.PROFILE]: [IAM_SCOPES.ADMIN_HEALTH_INFO],
   [IAM_PAGES.HEALTH]: [IAM_SCOPES.ADMIN_HEALTH_INFO],
+  [IAM_PAGES.SUPPORT_INSPECT]: [IAM_SCOPES.ADMIN_HEALTH_INFO],
   [IAM_PAGES.LICENSE]: [
+    IAM_SCOPES.ADMIN_SERVER_INFO,
+    IAM_SCOPES.ADMIN_CONFIG_UPDATE,
+  ],
+  [IAM_PAGES.SITE_REPLICATION]: [
     IAM_SCOPES.ADMIN_SERVER_INFO,
     IAM_SCOPES.ADMIN_CONFIG_UPDATE,
   ],

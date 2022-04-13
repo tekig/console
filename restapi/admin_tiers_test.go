@@ -37,6 +37,14 @@ func (ac adminClientMock) listTiers(ctx context.Context) ([]*madmin.TierConfig, 
 }
 
 // assigning mock at runtime instead of compile time
+var minioTierStatsMock func(ctx context.Context) ([]madmin.TierInfo, error)
+
+// mock function of tierStats()
+func (ac adminClientMock) tierStats(ctx context.Context) ([]madmin.TierInfo, error) {
+	return minioTierStatsMock(ctx)
+}
+
+// assigning mock at runtime instead of compile time
 var minioAddTiersMock func(ctx context.Context, tier *madmin.TierConfig) error
 
 // mock function of addTier()
@@ -58,8 +66,8 @@ func TestGetTiers(t *testing.T) {
 	adminClient := adminClientMock{}
 
 	function := "getTiers()"
-	ctx := context.Background()
-
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	// Test-1 : getBucketLifecycle() get list of tiers
 	// mock lifecycle response from MinIO
 	returnListMock := []*madmin.TierConfig{
@@ -79,6 +87,19 @@ func TestGetTiers(t *testing.T) {
 		},
 	}
 
+	returnStatsMock := []madmin.TierInfo{
+		{
+			Name:  "STANDARD",
+			Type:  "internal",
+			Stats: madmin.TierStats{NumObjects: 2, NumVersions: 2, TotalSize: 228915},
+		},
+		{
+			Name:  "S3 Tier",
+			Type:  "s3",
+			Stats: madmin.TierStats{NumObjects: 0, NumVersions: 0, TotalSize: 0},
+		},
+	}
+
 	expectedOutput := &models.TierListResponse{
 		Items: []*models.Tier{
 			{
@@ -92,6 +113,9 @@ func TestGetTiers(t *testing.T) {
 					Prefix:       "pref1",
 					Region:       "us-west-1",
 					Storageclass: "TT1",
+					Usage:        "0 B",
+					Objects:      "0",
+					Versions:     "0",
 				},
 			},
 		},
@@ -99,6 +123,10 @@ func TestGetTiers(t *testing.T) {
 
 	minioListTiersMock = func(ctx context.Context) ([]*madmin.TierConfig, error) {
 		return returnListMock, nil
+	}
+
+	minioTierStatsMock = func(ctx context.Context) ([]madmin.TierInfo, error) {
+		return returnStatsMock, nil
 	}
 
 	tiersList, err := getTiers(ctx, adminClient)
@@ -163,8 +191,8 @@ func TestAddTier(t *testing.T) {
 	adminClient := adminClientMock{}
 
 	function := "addTier()"
-	ctx := context.Background()
-
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	// Test-1: addTier() add new Tier
 	minioAddTiersMock = func(ctx context.Context, tier *madmin.TierConfig) error {
 		return nil
@@ -205,8 +233,8 @@ func TestUpdateTierCreds(t *testing.T) {
 	adminClient := adminClientMock{}
 
 	function := "editTierCredentials()"
-	ctx := context.Background()
-
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	// Test-1: editTierCredentials() update Tier configuration
 	minioEditTiersMock = func(ctx context.Context, tierName string, creds madmin.TierCreds) error {
 		return nil

@@ -30,6 +30,7 @@ import (
 	"time"
 
 	"github.com/minio/minio-go/v7/pkg/credentials"
+	"github.com/minio/minio-go/v7/pkg/set"
 
 	"github.com/minio/console/pkg/auth/utils"
 	"golang.org/x/crypto/pbkdf2"
@@ -142,13 +143,33 @@ func getLoginCallbackURL(r *http.Request) string {
 	return redirectURL
 }
 
+var requiredResponseTypes = set.CreateStringSet("code")
+
 // NewOauth2ProviderClient instantiates a new oauth2 client using the configured credentials
 // it returns a *Provider object that contains the necessary configuration to initiate an
-// oauth2 authentication flow
+// oauth2 authentication flow.
+//
+// We only support Authentication with the Authorization Code Flow - spec:
+// https://openid.net/specs/openid-connect-core-1_0.html#CodeFlowAuth
 func NewOauth2ProviderClient(scopes []string, r *http.Request, httpClient *http.Client) (*Provider, error) {
 	ddoc, err := parseDiscoveryDoc(GetIDPURL(), httpClient)
 	if err != nil {
 		return nil, err
+	}
+
+	supportedResponseTypes := set.NewStringSet()
+	for _, responseType := range ddoc.ResponseTypesSupported {
+		// FIXME: ResponseTypesSupported is a JSON array of strings - it
+		// may not actually have strings with spaces inside them -
+		// making the following code unnecessary.
+		for _, s := range strings.Fields(responseType) {
+			supportedResponseTypes.Add(s)
+		}
+	}
+	isSupported := requiredResponseTypes.Difference(supportedResponseTypes).IsEmpty()
+
+	if !isSupported {
+		return nil, fmt.Errorf("expected 'code' response type - got %s, login not allowed", ddoc.ResponseTypesSupported)
 	}
 
 	// If provided scopes are empty we use a default list or the user configured list

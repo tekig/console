@@ -15,8 +15,16 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { SubnetInfo } from "../../License/types";
-import { IAffinityModel } from "../../../../common/types";
-import { NodeMaxAllocatableResources } from "../types";
+import {
+  IAffinityModel,
+  IResourceModel,
+  ITolerationModel,
+} from "../../../../common/types";
+import {
+  ICertificateInfo,
+  ISecurityContext,
+  NodeMaxAllocatableResources,
+} from "../types";
 
 export interface IEvent {
   namespace: string;
@@ -25,6 +33,15 @@ export interface IEvent {
   message: string;
   event_type: string;
   reason: string;
+}
+
+interface IRequestResource {
+  cpu: number;
+  memory: number;
+}
+
+export interface IResources {
+  requests: IRequestResource;
 }
 
 export interface IPool {
@@ -36,6 +53,10 @@ export interface IPool {
   capacity: string;
   volumes: number;
   label?: string;
+  resources?: IResources;
+  affinity?: IAffinityModel;
+  tolerations?: ITolerationModel[];
+  securityContext?: ISecurityContext | null;
 }
 
 export interface IPodListElement {
@@ -56,6 +77,8 @@ export interface IAddPoolRequest {
   volumes_per_server: number;
   volume_configuration: IVolumeConfiguration;
   affinity?: IAffinityModel;
+  tolerations?: ITolerationModel[];
+  securityContext?: ISecurityContext | null;
 }
 
 export interface IVolumeConfiguration {
@@ -75,6 +98,7 @@ export interface ITenantStatusUsage {
   capacity: number;
   capacity_usage: number;
 }
+
 export interface ITenantStatus {
   write_quorum: string;
   drives_online: string;
@@ -82,6 +106,39 @@ export interface ITenantStatus {
   drives_healing: string;
   health_status: string;
   usage?: ITenantStatusUsage;
+}
+
+export interface ITenantEncryptionResponse {
+  image: string;
+  replicas: string;
+  securityContext: ISecurityContext;
+  server: ICertificateInfo[];
+  client: ICertificateInfo[];
+  /*
+            gemalto:
+              type: object
+              $ref: "#/definitions/gemaltoConfiguration"
+            aws:
+              type: object
+              $ref: "#/definitions/awsConfiguration"
+            vault:
+              type: object
+              $ref: "#/definitions/vaultConfiguration"
+            gcp:
+              type: object
+              $ref: "#/definitions/gcpConfiguration"
+            azure:
+              type: object
+              $ref: "#/definitions/azureConfiguration"
+            securityContext:
+              type: object
+              $ref: "#/definitions/securityContext"*/
+}
+
+export interface ITenantTier {
+  name: string;
+  type: string;
+  size: number;
 }
 
 export interface ITenant {
@@ -92,7 +149,7 @@ export interface ITenant {
   pool_count: number;
   currentState: string;
   instance_count: 4;
-  creation_date: Date;
+  creation_date: string;
   volume_size: number;
   volume_count: number;
   volumes_per_server: number;
@@ -112,6 +169,7 @@ export interface ITenant {
   capacity_raw_usage?: number;
   capacity?: number;
   capacity_usage?: number;
+  tiers?: ITenantTier[];
   // computed
   total_capacity: string;
   subnet_license: SubnetInfo;
@@ -186,4 +244,29 @@ export interface ITenantLogsStruct {
 export interface ValueUnit {
   value: string;
   unit: string;
+}
+
+export interface CapacityValues {
+  value: number;
+  variant: string;
+}
+
+export interface CapacityValue {
+  value: number;
+  label: string;
+  color: string;
+}
+
+export interface IEditPoolItem {
+  name: string;
+  servers: number;
+  volumes_per_server: number;
+  volume_configuration: IVolumeConfiguration;
+  affinity?: IAffinityModel;
+  tolerations?: ITolerationModel[];
+  securityContext?: ISecurityContext | null;
+}
+
+export interface IEditPoolRequest {
+  pools: IEditPoolItem[];
 }

@@ -19,17 +19,16 @@ package restapi
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
-	"fmt"
 	"strings"
-	"time"
-
-	"github.com/minio/console/restapi/operations/admin_api"
 
 	"github.com/go-openapi/runtime/middleware"
 	"github.com/minio/console/models"
 	"github.com/minio/console/restapi/operations"
+	"github.com/minio/console/restapi/operations/admin_api"
 	"github.com/minio/console/restapi/operations/user_api"
+	"github.com/minio/madmin-go"
 	iampolicy "github.com/minio/pkg/iam/policy"
 )
 
@@ -99,6 +98,21 @@ func registerServiceAccountsHandlers(api *operations.ConsoleAPI) {
 		return user_api.NewGetServiceAccountPolicyOK().WithPayload(serviceAccounts)
 	})
 
+	api.UserAPISetServiceAccountPolicyHandler = user_api.SetServiceAccountPolicyHandlerFunc(func(params user_api.SetServiceAccountPolicyParams, session *models.Principal) middleware.Responder {
+		err := getSetServiceAccountPolicyResponse(session, params.AccessKey, *params.Policy.Policy)
+		if err != nil {
+			return user_api.NewSetServiceAccountPolicyDefault(int(err.Code)).WithPayload(err)
+		}
+		return user_api.NewSetServiceAccountPolicyOK()
+	})
+
+	// Delete multiple service accounts
+	api.UserAPIDeleteMultipleServiceAccountsHandler = user_api.DeleteMultipleServiceAccountsHandlerFunc(func(params user_api.DeleteMultipleServiceAccountsParams, session *models.Principal) middleware.Responder {
+		if err := getDeleteMultipleServiceAccountsResponse(session, params.SelectedSA); err != nil {
+			return user_api.NewDeleteMultipleServiceAccountsDefault(int(err.Code)).WithPayload(err)
+		}
+		return user_api.NewDeleteMultipleServiceAccountsNoContent()
+	})
 }
 
 // createServiceAccount adds a service account to the userClient and assigns a policy to him if defined.
@@ -113,12 +127,11 @@ func createServiceAccount(ctx context.Context, userClient MinioAdmin, policy str
 		}
 		iamPolicy = iamp
 	}
-
 	creds, err := userClient.addServiceAccount(ctx, iamPolicy, "", "", "")
 	if err != nil {
 		return nil, err
 	}
-	return &models.ServiceAccountCreds{AccessKey: creds.AccessKey, SecretKey: creds.SecretKey}, nil
+	return &models.ServiceAccountCreds{AccessKey: creds.AccessKey, SecretKey: creds.SecretKey, URL: getMinIOServer()}, nil
 }
 
 // createServiceAccount adds a service account with the given credentials to the userClient and assigns a policy to him if defined.
@@ -133,19 +146,18 @@ func createServiceAccountCreds(ctx context.Context, userClient MinioAdmin, polic
 		}
 		iamPolicy = iamp
 	}
-
 	creds, err := userClient.addServiceAccount(ctx, iamPolicy, "", accessKey, secretKey)
 	if err != nil {
 		return nil, err
 	}
-	return &models.ServiceAccountCreds{AccessKey: creds.AccessKey, SecretKey: creds.SecretKey}, nil
+	return &models.ServiceAccountCreds{AccessKey: creds.AccessKey, SecretKey: creds.SecretKey, URL: getMinIOServer()}, nil
 }
 
 // getCreateServiceAccountResponse creates a service account with the defined policy for the user that
 //   is requestingit ,it first gets the credentials of the user and creates a client which is going to
 //   make the call to create the Service Account
 func getCreateServiceAccountResponse(session *models.Principal, serviceAccount *models.ServiceAccountRequest) (*models.ServiceAccountCreds, *models.Error) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*20)
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	userAdmin, err := NewMinioAdminClient(session)
@@ -180,7 +192,7 @@ func createAUserServiceAccount(ctx context.Context, userClient MinioAdmin, polic
 	if err != nil {
 		return nil, err
 	}
-	return &models.ServiceAccountCreds{AccessKey: creds.AccessKey, SecretKey: creds.SecretKey}, nil
+	return &models.ServiceAccountCreds{AccessKey: creds.AccessKey, SecretKey: creds.SecretKey, URL: getMinIOServer()}, nil
 }
 
 func createAUserServiceAccountCreds(ctx context.Context, userClient MinioAdmin, policy string, user string, accessKey string, secretKey string) (*models.ServiceAccountCreds, error) {
@@ -199,14 +211,14 @@ func createAUserServiceAccountCreds(ctx context.Context, userClient MinioAdmin, 
 	if err != nil {
 		return nil, err
 	}
-	return &models.ServiceAccountCreds{AccessKey: creds.AccessKey, SecretKey: creds.SecretKey}, nil
+	return &models.ServiceAccountCreds{AccessKey: creds.AccessKey, SecretKey: creds.SecretKey, URL: getMinIOServer()}, nil
 }
 
 // getCreateServiceAccountResponse creates a service account with the defined policy for the user that
 //   is requesting it ,it first gets the credentials of the user and creates a client which is going to
 //   make the call to create the Service Account
 func getCreateAUserServiceAccountResponse(session *models.Principal, serviceAccount *models.ServiceAccountRequest, user string) (*models.ServiceAccountCreds, *models.Error) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*20)
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	userAdmin, err := NewMinioAdminClient(session)
@@ -227,7 +239,7 @@ func getCreateAUserServiceAccountResponse(session *models.Principal, serviceAcco
 // getCreateServiceAccountCredsResponse creates a service account with the defined policy for the user that
 //   is requesting it, and with the credentials provided
 func getCreateAUserServiceAccountCredsResponse(session *models.Principal, serviceAccount *models.ServiceAccountRequestCreds, user string) (*models.ServiceAccountCreds, *models.Error) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*20)
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	userAdmin, err := NewMinioAdminClient(session)
@@ -261,7 +273,7 @@ func getCreateAUserServiceAccountCredsResponse(session *models.Principal, servic
 }
 
 func getCreateServiceAccountCredsResponse(session *models.Principal, serviceAccount *models.ServiceAccountRequestCreds) (*models.ServiceAccountCreds, *models.Error) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*20)
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	userAdmin, err := NewMinioAdminClient(session)
@@ -277,7 +289,6 @@ func getCreateServiceAccountCredsResponse(session *models.Principal, serviceAcco
 	}
 
 	accounts, err := userAdminClient.listServiceAccounts(ctx, "")
-	fmt.Println("dummy line")
 	if err != nil {
 		return nil, prepareError(err)
 	}
@@ -311,7 +322,7 @@ func getUserServiceAccounts(ctx context.Context, userClient MinioAdmin, user str
 // getUserServiceAccountsResponse authenticates the user and calls
 // getUserServiceAccounts to list the user's service accounts
 func getUserServiceAccountsResponse(session *models.Principal, user string) (models.ServiceAccounts, *models.Error) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*20)
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	userAdmin, err := NewMinioAdminClient(session)
@@ -336,7 +347,7 @@ func deleteServiceAccount(ctx context.Context, userClient MinioAdmin, accessKey 
 
 // getDeleteServiceAccountResponse authenticates the user and calls deleteServiceAccount
 func getDeleteServiceAccountResponse(session *models.Principal, accessKey string) *models.Error {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*20)
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	userAdmin, err := NewMinioAdminClient(session)
@@ -359,13 +370,18 @@ func getServiceAccountPolicy(ctx context.Context, userClient MinioAdmin, accessK
 	if err != nil {
 		return "", err
 	}
+	var policy iampolicy.Policy
+	json.Unmarshal([]byte(serviceAccountInfo.Policy), &policy)
+	if policy.Statements == nil {
+		return "", nil
+	}
 	return serviceAccountInfo.Policy, nil
 }
 
 // getServiceAccountPolicyResponse authenticates the user and calls
 // getServiceAccountPolicy to get the policy for a service account
 func getServiceAccountPolicyResponse(session *models.Principal, accessKey string) (string, *models.Error) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*20)
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	userAdmin, err := NewMinioAdminClient(session)
@@ -381,4 +397,50 @@ func getServiceAccountPolicyResponse(session *models.Principal, accessKey string
 		return "", prepareError(err)
 	}
 	return serviceAccounts, nil
+}
+
+// setServiceAccountPolicy sets policy for a service account
+func setServiceAccountPolicy(ctx context.Context, userClient MinioAdmin, accessKey string, policy string) error {
+	err := userClient.updateServiceAccount(ctx, accessKey, madmin.UpdateServiceAccountReq{NewPolicy: json.RawMessage(policy)})
+	return err
+}
+
+// getSetServiceAccountPolicyResponse authenticates the user and calls
+// getSetServiceAccountPolicy to set the policy for a service account
+func getSetServiceAccountPolicyResponse(session *models.Principal, accessKey string, policy string) *models.Error {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	userAdmin, err := NewMinioAdminClient(session)
+	if err != nil {
+		return prepareError(err)
+	}
+	// create a MinIO user Admin Client interface implementation
+	// defining the client to be used
+	userAdminClient := AdminClient{Client: userAdmin}
+
+	err = setServiceAccountPolicy(ctx, userAdminClient, accessKey, policy)
+	if err != nil {
+		return prepareError(err)
+	}
+	return nil
+}
+
+// getDeleteMultipleServiceAccountsResponse authenticates the user and calls deleteServiceAccount for each account listed in selectedSAs
+func getDeleteMultipleServiceAccountsResponse(session *models.Principal, selectedSAs []string) *models.Error {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	userAdmin, err := NewMinioAdminClient(session)
+	if err != nil {
+		return prepareError(err)
+	}
+	// create a MinIO user Admin Client interface implementation
+	// defining the client to be used
+	userAdminClient := AdminClient{Client: userAdmin}
+	for _, sa := range selectedSAs {
+		if err := deleteServiceAccount(ctx, userAdminClient, sa); err != nil {
+			return prepareError(err)
+		}
+	}
+	return nil
 }

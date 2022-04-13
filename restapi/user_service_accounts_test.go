@@ -33,6 +33,7 @@ var minioAddServiceAccountMock func(ctx context.Context, policy *iampolicy.Polic
 var minioListServiceAccountsMock func(ctx context.Context, user string) (madmin.ListServiceAccountsResp, error)
 var minioDeleteServiceAccountMock func(ctx context.Context, serviceAccount string) error
 var minioInfoServiceAccountMock func(ctx context.Context, serviceAccount string) (madmin.InfoServiceAccountResp, error)
+var minioUpdateServiceAccountMock func(ctx context.Context, serviceAccount string, opts madmin.UpdateServiceAccountReq) error
 
 // mock function of AddServiceAccount()
 func (ac adminClientMock) addServiceAccount(ctx context.Context, policy *iampolicy.Policy, user string, accessKey string, secretKey string) (madmin.Credentials, error) {
@@ -54,13 +55,19 @@ func (ac adminClientMock) infoServiceAccount(ctx context.Context, serviceAccount
 	return minioInfoServiceAccountMock(ctx, serviceAccount)
 }
 
+// mock function of UpdateServiceAccount()
+func (ac adminClientMock) updateServiceAccount(ctx context.Context, serviceAccount string, opts madmin.UpdateServiceAccountReq) error {
+	return minioUpdateServiceAccountMock(ctx, serviceAccount, opts)
+}
+
 func TestAddServiceAccount(t *testing.T) {
 	assert := assert.New(t)
 	// mock minIO client
 	client := adminClientMock{}
 	function := "createServiceAccount()"
 	// Test-1: createServiceAccount create a service account by assigning it a policy
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	policyDefinition := "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Action\":[\"s3:GetBucketLocation\",\"s3:GetObject\",\"s3:ListAllMyBuckets\"],\"Resource\":[\"arn:aws:s3:::bucket1/*\"]}]}"
 	mockResponse := madmin.Credentials{
 		AccessKey: "minio",
@@ -110,7 +117,8 @@ func TestListServiceAccounts(t *testing.T) {
 	function := "getUserServiceAccounts()"
 
 	// Test-1: getUserServiceAccounts list serviceaccounts for a user
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	mockResponse := madmin.ListServiceAccountsResp{
 		Accounts: []string{"accesskey1", "accesskey2"},
 	}
@@ -140,7 +148,8 @@ func TestDeleteServiceAccount(t *testing.T) {
 	// mock minIO client
 	client := adminClientMock{}
 	function := "deleteServiceAccount()"
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	// Test-1: deleteServiceAccount receive a service account to delete
 	testServiceAccount := "accesskeytest"
@@ -168,10 +177,26 @@ func TestGetServiceAccountPolicy(t *testing.T) {
 	function := "getServiceAccountPolicy()"
 
 	// Test-1: getServiceAccountPolicy list serviceaccounts for a user
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	mockResponse := madmin.InfoServiceAccountResp{
-		Policy: "{\n \"Version\": \"2012-10-17\",\n \"Statement\": [\n  {\n   \"Effect\": \"Allow\",\n   \"Action\": [\n    \"s3:PutObject\"\n   ],\n   \"Resource\": [\n    \"arn:aws:s3:::*\"\n   ]\n  }\n ]\n}",
+		Policy: `
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "s3:PutObject"
+      ],
+      "Resource": [
+        "arn:aws:s3:::*"
+      ]
+    }
+  ]
+}`,
 	}
+
 	minioInfoServiceAccountMock = func(ctx context.Context, user string) (madmin.InfoServiceAccountResp, error) {
 		return mockResponse, nil
 	}

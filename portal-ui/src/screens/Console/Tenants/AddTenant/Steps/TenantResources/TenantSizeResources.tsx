@@ -34,6 +34,7 @@ import api from "../../../../../../common/api";
 import InputBoxWrapper from "../../../../Common/FormComponents/InputBoxWrapper/InputBoxWrapper";
 import FormSwitchWrapper from "../../../../Common/FormComponents/FormSwitchWrapper/FormSwitchWrapper";
 import { floor } from "lodash";
+import InputUnitMenu from "../../../../Common/FormComponents/InputUnitMenu/InputUnitMenu";
 
 interface ITenantSizeResourcesProps {
   classes: any;
@@ -176,14 +177,19 @@ const TenantSizeResources = ({
         );
 
         const baseCpuUse = Math.max(1, floor(maxAllocatableCPU / 2));
-        updateField("resourcesCPURequest", baseCpuUse);
+        if (resourcesCPURequest === "") {
+          updateField("resourcesCPURequest", baseCpuUse);
+        }
 
         const baseMemoryUse = Math.max(2, floor(maxMemory / 2));
-        updateField("resourcesMemoryRequest", baseMemoryUse);
+        if (resourcesMemoryRequest === "") {
+          updateField("resourcesMemoryRequest", baseMemoryUse);
+        }
       })
       .catch((err: any) => {
         updateField("maxMemorySize", 0);
         updateField("resourcesCPURequest", "");
+        updateField("resourcesMemoryRequest", "");
 
         console.error(err);
       });
@@ -270,7 +276,16 @@ const TenantSizeResources = ({
             }
             updateField("resourcesMemoryRequest", e.target.value);
           }}
-          label="Memory Request [Gi]"
+          label="Memory Request"
+          overlayObject={
+            <InputUnitMenu
+              id={"size-unit"}
+              onUnitChange={() => {}}
+              unitSelected={"Gi"}
+              unitsList={[{ label: "Gi", value: "Gi" }]}
+              disabled={true}
+            />
+          }
           value={resourcesMemoryRequest}
           disabled={selectedStorageClass === ""}
           error={resourcesMemoryRequestError}
@@ -346,7 +361,16 @@ const TenantSizeResources = ({
                 }
                 updateField("resourcesMemoryLimit", e.target.value);
               }}
-              label="Memory Limit [Gi]"
+              label="Memory Limit"
+              overlayObject={
+                <InputUnitMenu
+                  id={"size-unit"}
+                  onUnitChange={() => {}}
+                  unitSelected={"Gi"}
+                  unitsList={[{ label: "Gi", value: "Gi" }]}
+                  disabled={true}
+                />
+              }
               value={resourcesMemoryLimit}
               disabled={selectedStorageClass === ""}
               error={resourcesMemoryLimitError}

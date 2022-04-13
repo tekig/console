@@ -47,10 +47,12 @@ import {
   IAM_SCOPES,
   S3_ALL_RESOURCES,
 } from "../../../common/SecureComponent/permissions";
-import SecureComponent, {
-  hasPermission,
-} from "../../../common/SecureComponent/SecureComponent";
+
 import RBIconButton from "../Buckets/BucketDetails/SummaryItems/RBIconButton";
+import {
+  hasPermission,
+  SecureComponent,
+} from "../../../common/SecureComponent";
 
 const AddUser = withSuspense(React.lazy(() => import("./AddUser")));
 const SetPolicy = withSuspense(
@@ -288,9 +290,7 @@ const ListUsers = ({ classes, setErrorSnackMessage, history }: IUsersProps) => {
             />
           </SecureComponent>
         </Grid>
-        <Grid item xs={12}>
-          <br />
-        </Grid>
+
         {loading && <LinearProgress />}
         {!loading && (
           <Fragment>
@@ -316,7 +316,7 @@ const ListUsers = ({ classes, setErrorSnackMessage, history }: IUsersProps) => {
                     />
                   </SecureComponent>
                 </Grid>
-                <Grid item xs={12}>
+                <Grid item xs={12} marginTop={"25px"}>
                   <HelpBox
                     title={"Users"}
                     iconComponent={<UsersIcon />}

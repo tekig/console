@@ -35,11 +35,6 @@ import (
 
 const globalAppName = "MinIO Console"
 
-// NewAdminClient gives a new madmin client interface
-func NewAdminClient(url, accessKey, secretKey, sessionToken string) (*madmin.AdminClient, *probe.Error) {
-	return NewAdminClientWithInsecure(url, accessKey, secretKey, sessionToken, false)
-}
-
 // NewAdminClientWithInsecure gives a new madmin client interface either secure or insecure based on parameter
 func NewAdminClientWithInsecure(url, accessKey, secretKey, sessionToken string, insecure bool) (*madmin.AdminClient, *probe.Error) {
 	s3Client, err := s3AdminNew(&mcCmd.Config{
@@ -99,6 +94,7 @@ type MinioAdmin interface {
 	listServiceAccounts(ctx context.Context, user string) (madmin.ListServiceAccountsResp, error)
 	deleteServiceAccount(ctx context.Context, serviceAccount string) error
 	infoServiceAccount(ctx context.Context, serviceAccount string) (madmin.InfoServiceAccountResp, error)
+	updateServiceAccount(ctx context.Context, serviceAccount string, opts madmin.UpdateServiceAccountReq) error
 	// Remote Buckets
 	listRemoteBuckets(ctx context.Context, bucket, arnType string) (targets []madmin.BucketTarget, err error)
 	getRemoteBucket(ctx context.Context, bucket, arnType string) (targets *madmin.BucketTarget, err error)
@@ -110,12 +106,19 @@ type MinioAdmin interface {
 	serverHealthInfo(ctx context.Context, healthDataTypes []madmin.HealthDataType, deadline time.Duration) (interface{}, string, error)
 	// List Tiers
 	listTiers(ctx context.Context) ([]*madmin.TierConfig, error)
+	// Tier Info
+	tierStats(ctx context.Context) ([]madmin.TierInfo, error)
 	// Add Tier
 	addTier(ctx context.Context, tier *madmin.TierConfig) error
 	// Edit Tier Credentials
 	editTierCreds(ctx context.Context, tierName string, creds madmin.TierCreds) error
 	// Speedtest
 	speedtest(ctx context.Context, opts madmin.SpeedtestOpts) (chan madmin.SpeedTestResult, error)
+	// Site Relication
+	getSiteReplicationInfo(ctx context.Context) (*madmin.SiteReplicationInfo, error)
+	addSiteReplicationInfo(ctx context.Context, sites []madmin.PeerSite) (*madmin.ReplicateAddStatus, error)
+	editSiteReplicationInfo(ctx context.Context, site madmin.PeerInfo) (*madmin.ReplicateEditStatus, error)
+	deleteSiteReplicationInfo(ctx context.Context, removeReq madmin.SRRemoveReq) (*madmin.ReplicateRemoveStatus, error)
 }
 
 // Interface implementation
@@ -279,6 +282,7 @@ func (ac AdminClient) serviceTrace(ctx context.Context, threshold int64, s3, int
 
 // implements madmin.GetLogs()
 func (ac AdminClient) getLogs(ctx context.Context, node string, lineCnt int, logKind string) <-chan madmin.LogInfo {
+
 	return ac.Client.GetLogs(ctx, node, lineCnt, logKind)
 }
 
@@ -310,6 +314,11 @@ func (ac AdminClient) deleteServiceAccount(ctx context.Context, serviceAccount s
 // implements madmin.InfoServiceAccount()
 func (ac AdminClient) infoServiceAccount(ctx context.Context, serviceAccount string) (madmin.InfoServiceAccountResp, error) {
 	return ac.Client.InfoServiceAccount(ctx, serviceAccount)
+}
+
+// implements madmin.UpdateServiceAccount()
+func (ac AdminClient) updateServiceAccount(ctx context.Context, serviceAccount string, opts madmin.UpdateServiceAccountReq) error {
+	return ac.Client.UpdateServiceAccount(ctx, serviceAccount, opts)
 }
 
 // AccountInfo implements madmin.AccountInfo()
@@ -405,9 +414,19 @@ func (ac AdminClient) listTiers(ctx context.Context) ([]*madmin.TierConfig, erro
 	return ac.Client.ListTiers(ctx)
 }
 
+// implements madmin.tierStats()
+func (ac AdminClient) tierStats(ctx context.Context) ([]madmin.TierInfo, error) {
+	return ac.Client.TierStats(ctx)
+}
+
 // implements madmin.AddTier()
 func (ac AdminClient) addTier(ctx context.Context, cfg *madmin.TierConfig) error {
 	return ac.Client.AddTier(ctx, cfg)
+}
+
+// implements madmin.Inspect()
+func (ac AdminClient) inspect(ctx context.Context, insOpts madmin.InspectOptions) ([32]byte, io.ReadCloser, error) {
+	return ac.Client.Inspect(ctx, insOpts)
 }
 
 // implements madmin.EditTier()
@@ -470,4 +489,61 @@ func GetConsoleHTTPClient() *http.Client {
 
 func (ac AdminClient) speedtest(ctx context.Context, opts madmin.SpeedtestOpts) (chan madmin.SpeedTestResult, error) {
 	return ac.Client.Speedtest(ctx, opts)
+}
+
+//Site Replication
+func (ac AdminClient) getSiteReplicationInfo(ctx context.Context) (*madmin.SiteReplicationInfo, error) {
+
+	res, err := ac.Client.SiteReplicationInfo(ctx)
+
+	if err != nil {
+		return nil, err
+	}
+	return &madmin.SiteReplicationInfo{
+		Enabled:                 res.Enabled,
+		Name:                    res.Name,
+		Sites:                   res.Sites,
+		ServiceAccountAccessKey: res.ServiceAccountAccessKey,
+	}, nil
+}
+
+func (ac AdminClient) addSiteReplicationInfo(ctx context.Context, sites []madmin.PeerSite) (*madmin.ReplicateAddStatus, error) {
+
+	res, err := ac.Client.SiteReplicationAdd(ctx, sites)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &madmin.ReplicateAddStatus{
+		Success:                 res.Success,
+		Status:                  res.Status,
+		ErrDetail:               res.ErrDetail,
+		InitialSyncErrorMessage: res.InitialSyncErrorMessage,
+	}, nil
+}
+
+func (ac AdminClient) editSiteReplicationInfo(ctx context.Context, site madmin.PeerInfo) (*madmin.ReplicateEditStatus, error) {
+
+	res, err := ac.Client.SiteReplicationEdit(ctx, site)
+	if err != nil {
+		return nil, err
+	}
+	return &madmin.ReplicateEditStatus{
+		Success:   res.Success,
+		Status:    res.Status,
+		ErrDetail: res.ErrDetail,
+	}, nil
+}
+
+func (ac AdminClient) deleteSiteReplicationInfo(ctx context.Context, removeReq madmin.SRRemoveReq) (*madmin.ReplicateRemoveStatus, error) {
+
+	res, err := ac.Client.SiteReplicationRemove(ctx, removeReq)
+	if err != nil {
+		return nil, err
+	}
+	return &madmin.ReplicateRemoveStatus{
+		Status:    res.Status,
+		ErrDetail: res.ErrDetail,
+	}, nil
 }

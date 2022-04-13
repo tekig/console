@@ -26,7 +26,7 @@ import {
   searchField,
   tenantDetailsStyles,
 } from "../../Common/FormComponents/common/styleLibrary";
-import { CircularProgress, DialogContentText } from "@mui/material";
+import { DialogContentText } from "@mui/material";
 import Paper from "@mui/material/Paper";
 import { ITenant } from "../ListTenants/types";
 import { setErrorSnackMessage } from "../../../../actions";
@@ -41,6 +41,7 @@ import KeyPairView from "./KeyPairView";
 import { niceBytes } from "../../../../common/utils";
 import ConfirmDialog from "../../Common/ModalWrapper/ConfirmDialog";
 import RBIconButton from "../../Buckets/BucketDetails/SummaryItems/RBIconButton";
+import Loader from "../../Common/Loader/Loader";
 
 interface ITenantMonitoring {
   classes: any;
@@ -187,43 +188,54 @@ const TenantMonitoring = ({
         />
       )}
 
-      <h1 className={classes.sectionTitle}>Monitoring</h1>
-      <div className={classes.actionsTray}>
-        <FormSwitchWrapper
-          label={"Prometheus Monitoring"}
-          indicatorLabels={["Enabled", "Disabled"]}
-          checked={prometheusMonitoringEnabled}
-          value={"monitoring_status"}
-          id="monitoring-status"
-          name="monitoring-status"
-          onChange={(e) => {
-            setConfirmOpen(true);
-          }}
-          description=""
-        />
-        {prometheusMonitoringEnabled && (
-          <RBIconButton
-            tooltip={"Edit Monitoring configuration"}
-            text={"Edit"}
-            onClick={() => {
-              setEdit(true);
+      <Grid container alignItems={"center"}>
+        <Grid item xs>
+          <h1 className={classes.sectionTitle}>Monitoring</h1>
+        </Grid>
+        <Grid item xs={4}>
+          <FormSwitchWrapper
+            indicatorLabels={["Enabled", "Disabled"]}
+            checked={prometheusMonitoringEnabled}
+            value={"monitoring_status"}
+            id="monitoring-status"
+            name="monitoring-status"
+            onChange={(e) => {
+              setConfirmOpen(true);
             }}
-            icon={<EditIcon />}
-            color="primary"
-            variant={"contained"}
+            description=""
           />
-        )}
-      </div>
+        </Grid>
+      </Grid>
       {prometheusMonitoringEnabled && monitoringInfo !== undefined && (
         <Paper className={classes.paperContainer}>
           <Grid container>
             <Grid item xs={12}>
+              <Grid container alignItems={"center"}>
+                <Grid xs={8}>
+                  <h3>Configuration</h3>
+                </Grid>
+                <Grid xs={4} justifyContent={"end"} textAlign={"right"}>
+                  <RBIconButton
+                    tooltip={"Edit Monitoring configuration"}
+                    text={"Edit"}
+                    onClick={() => {
+                      setEdit(true);
+                    }}
+                    icon={<EditIcon />}
+                    color="primary"
+                    variant={"contained"}
+                  />
+                </Grid>
+              </Grid>
+            </Grid>
+            <Grid item xs={12}>
+              <hr className={classes.hrClass} />
               <table width={"100%"}>
                 <tbody>
                   {loadingTenant ? (
                     <tr>
                       <td className={classes.centerAlign} colSpan={4}>
-                        <CircularProgress />
+                        <Loader />
                       </td>
                     </tr>
                   ) : (

@@ -75,6 +75,7 @@ func configureAPI(api *operations.OperatorAPI) http.Handler {
 	// Register login handlers
 	registerLoginHandlers(api)
 	registerSessionHandlers(api)
+	registerVersionHandlers(api)
 
 	// Operator Console
 	// Register tenant handlers
@@ -86,8 +87,6 @@ func configureAPI(api *operations.OperatorAPI) http.Handler {
 	// Register Parity' handlers
 	registerParityHandlers(api)
 
-	// Direct CSI handlers
-	registerDirectCSIHandlers(api)
 	// Volumes handlers
 	registerVolumesHandlers(api)
 	// Namespaces handlers
@@ -140,7 +139,7 @@ func AuthenticationMiddleware(next http.Handler) http.Handler {
 // proxyMiddleware adds the proxy capability
 func proxyMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if strings.HasPrefix(r.URL.Path, "/api/proxy") {
+		if strings.HasPrefix(r.URL.Path, "/api/proxy") || strings.HasPrefix(r.URL.Path, "/api/hop") {
 			serveProxy(w, r)
 		} else {
 			next.ServeHTTP(w, r)

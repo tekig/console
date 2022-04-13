@@ -45,9 +45,10 @@ import {
   IAM_PAGES,
   IAM_SCOPES,
 } from "../../../common/SecureComponent/permissions";
-import SecureComponent, {
+import {
+  SecureComponent,
   hasPermission,
-} from "../../../common/SecureComponent/SecureComponent";
+} from "../../../common/SecureComponent";
 
 import withSuspense from "../Common/Components/withSuspense";
 import RBIconButton from "../Buckets/BucketDetails/SummaryItems/RBIconButton";
@@ -258,7 +259,7 @@ const Groups = ({ classes, setErrorSnackMessage }: IGroupsProps) => {
                     />
                   </SecureComponent>
                 </Grid>
-                <Grid item xs={12}>
+                <Grid item xs={12} marginTop={"25px"}>
                   <HelpBox
                     title={"Groups"}
                     iconComponent={<GroupsIcon />}

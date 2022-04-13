@@ -13,7 +13,8 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
-import React from "react";
+import React, { Fragment } from "react";
+import get from "lodash/get";
 import { Theme } from "@mui/material/styles";
 import createStyles from "@mui/styles/createStyles";
 import withStyles from "@mui/styles/withStyles";
@@ -26,14 +27,18 @@ import {
 } from "../../../../icons";
 import { Bucket } from "../types";
 import { Box, Grid, Typography } from "@mui/material";
-import { niceBytes, prettyNumber } from "../../../../common/utils";
+import {
+  calculateBytes,
+  niceBytes,
+  prettyNumber,
+} from "../../../../common/utils";
 import CheckboxWrapper from "../../Common/FormComponents/CheckboxWrapper/CheckboxWrapper";
 import { Link } from "react-router-dom";
 import {
   IAM_PERMISSIONS,
   IAM_ROLES,
 } from "../../../../common/SecureComponent/permissions";
-import SecureComponent from "../../../../common/SecureComponent/SecureComponent";
+import { SecureComponent } from "../../../../common/SecureComponent";
 import RBIconButton from "../BucketDetails/SummaryItems/RBIconButton";
 import clsx from "clsx";
 
@@ -136,6 +141,7 @@ const styles = (theme: Theme) =>
       "& .min-icon": {
         height: 48,
         width: 48,
+        color: theme.palette.primary.main,
       },
     },
     bucketInfo: {
@@ -163,7 +169,6 @@ const styles = (theme: Theme) =>
 interface IBucketListItem {
   bucket: Bucket;
   classes: any;
-  onDelete: (bucketName: string) => void;
   onSelect: (e: React.ChangeEvent<HTMLInputElement>) => void;
   selected: boolean;
   bulkSelect: boolean;
@@ -172,7 +177,6 @@ interface IBucketListItem {
 const BucketListItem = ({
   classes,
   bucket,
-  onDelete,
   onSelect,
   selected,
   bulkSelect,
@@ -180,6 +184,9 @@ const BucketListItem = ({
   const usage = niceBytes(`${bucket.size}` || "0");
   const usageScalar = usage.split(" ")[0];
   const usageUnit = usage.split(" ")[1];
+
+  const quota = get(bucket, "details.quota.quota", "0");
+  const quotaForString = calculateBytes(quota);
 
   const accessToStr = (bucket: Bucket): string => {
     if (bucket.rw_access?.read && !bucket.rw_access?.write) {
@@ -279,7 +286,9 @@ const BucketListItem = ({
       <Grid item xs={12} className={classes.bucketStats}>
         <Grid container justifyContent={"flex-start"} spacing={4}>
           <Grid item className={classes.bucketIcon}>
-            <BucketsIcon />
+            <Link to={`/buckets/${bucket.name}/browse`}>
+              <BucketsIcon />
+            </Link>
           </Grid>
           <Grid item textAlign={"left"} className={classes.metric}>
             <ReportedUsageIcon />
@@ -287,6 +296,13 @@ const BucketListItem = ({
             <div className={classes.metricText}>
               {usageScalar}
               <span className={classes.unit}>{usageUnit}</span>
+              {quota !== "0" && (
+                <Fragment>
+                  {" "}
+                  / {quotaForString.total}
+                  <span className={classes.unit}>{quotaForString.unit}</span>
+                </Fragment>
+              )}
             </div>
           </Grid>
           <Grid item textAlign={"left"} className={classes.metric}>

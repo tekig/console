@@ -40,6 +40,7 @@ interface InputBoxProps {
   label: string;
   classes: any;
   onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onKeyPress?: (e: any) => void;
   value: string | boolean;
   id: string;
   name: string;
@@ -54,6 +55,7 @@ interface InputBoxProps {
   placeholder?: string;
   min?: string;
   max?: string;
+  overlayId?: string;
   overlayIcon?: any;
   overlayAction?: () => void;
   overlayObject?: any;
@@ -83,10 +85,6 @@ const styles = (theme: Theme) =>
       "&.withLabel": {
         top: 5,
       },
-    },
-    inputLabel: {
-      ...fieldBasic.inputLabel,
-      fontWeight: "normal",
     },
   });
 
@@ -124,6 +122,7 @@ const InputBoxWrapper = ({
   placeholder = "",
   min,
   max,
+  overlayId,
   overlayIcon = null,
   overlayObject = null,
   extraInputProps = {},
@@ -133,6 +132,7 @@ const InputBoxWrapper = ({
   autoFocus = false,
   classes,
   className = "",
+  onKeyPress,
 }: InputBoxProps) => {
   let inputProps: any = { "data-index": index, ...extraInputProps };
 
@@ -197,6 +197,7 @@ const InputBoxWrapper = ({
             helperText={error}
             placeholder={placeholder}
             className={classes.inputRebase}
+            onKeyPress={onKeyPress}
           />
           {overlayIcon && (
             <div
@@ -212,6 +213,7 @@ const InputBoxWrapper = ({
                       }
                     : () => null
                 }
+                id={overlayId}
                 size={"small"}
                 disableFocusRipple={false}
                 disableRipple={false}

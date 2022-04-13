@@ -30,6 +30,8 @@ import {
 import MenuItem from "./MenuItem";
 import { useLocation } from "react-router-dom";
 
+import { IAM_PAGES } from "../../../common/SecureComponent/permissions";
+
 const ConsoleMenuList = ({
   menuItems,
   onLogoutClick,
@@ -41,22 +43,21 @@ const ConsoleMenuList = ({
 }) => {
   const stateClsName = isOpen ? "wide" : "mini";
   const { pathname = "" } = useLocation();
-  let selectedMenuGroup = pathname.slice(1, pathname.length); //single path
-  if (selectedMenuGroup.indexOf("/") !== -1) {
-    selectedMenuGroup = selectedMenuGroup.slice(
-      0,
-      selectedMenuGroup.indexOf("/")
-    ); //nested path
+  let groupToSelect = pathname.slice(1, pathname.length); //single path
+  if (groupToSelect.indexOf("/") !== -1) {
+    groupToSelect = groupToSelect.slice(0, groupToSelect.indexOf("/")); //nested path
   }
 
-  const [openGroup, setOpenGroup] = useState<string>(selectedMenuGroup);
+  const [expandGroup, setExpandGroup] = useState(IAM_PAGES.BUCKETS);
+  const [selectedMenuItem, setSelectedMenuItem] =
+    useState<string>(groupToSelect);
 
-  const [expandedGroup, setExpandedGroup] = useState<string>(selectedMenuGroup);
+  const [previewMenuGroup, setPreviewMenuGroup] = useState<string>("");
 
   useEffect(() => {
-    //in case of redirects.
-    setOpenGroup(selectedMenuGroup);
-  }, [selectedMenuGroup]);
+    setExpandGroup(groupToSelect);
+    setSelectedMenuItem(groupToSelect);
+  }, [groupToSelect]);
 
   return (
     <Box
@@ -102,19 +103,21 @@ const ConsoleMenuList = ({
         className={`${stateClsName} group-wrapper main-list`}
       >
         <React.Fragment>
-          {(menuItems || []).map((menuGroup: any) => {
+          {(menuItems || []).map((menuGroup: any, index) => {
             if (menuGroup) {
               return (
                 <MenuItem
                   stateClsName={stateClsName}
                   page={menuGroup}
-                  key={menuGroup.id}
+                  key={`${menuGroup.id}-${index.toString()}`}
                   id={menuGroup.id}
-                  selectedMenuGroup={openGroup}
-                  setSelectedMenuGroup={setOpenGroup}
+                  selectedMenuItem={selectedMenuItem}
+                  setSelectedMenuItem={setSelectedMenuItem}
                   pathValue={pathname}
-                  onExpand={setExpandedGroup}
-                  expandedGroup={expandedGroup}
+                  onExpand={setExpandGroup}
+                  expandedGroup={expandGroup}
+                  previewMenuGroup={previewMenuGroup}
+                  setPreviewMenuGroup={setPreviewMenuGroup}
                 />
               );
             }
@@ -157,6 +160,7 @@ const ConsoleMenuList = ({
           </ListItemIcon>
           <ListItemText
             primary="Logout"
+            id={"logout"}
             sx={{ ...menuItemTextStyles }}
             className={stateClsName}
           />

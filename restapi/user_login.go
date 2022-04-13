@@ -17,14 +17,12 @@
 package restapi
 
 import (
-	"bytes"
 	"context"
 	"net/http"
-	"time"
+
+	"github.com/minio/madmin-go"
 
 	"github.com/minio/minio-go/v7/pkg/credentials"
-
-	iampolicy "github.com/minio/pkg/iam/policy"
 
 	"github.com/go-openapi/runtime"
 	"github.com/go-openapi/runtime/middleware"
@@ -74,14 +72,14 @@ func registerLoginHandlers(api *operations.ConsoleAPI) {
 
 // login performs a check of ConsoleCredentials against MinIO, generates some claims and returns the jwt
 // for subsequent authentication
-func login(credentials ConsoleCredentialsI) (*string, error) {
+func login(credentials ConsoleCredentialsI, sessionFeatures *auth.SessionFeatures) (*string, error) {
 	// try to obtain consoleCredentials,
 	tokens, err := credentials.Get()
 	if err != nil {
 		return nil, err
 	}
 	// if we made it here, the consoleCredentials work, generate a jwt with claims
-	token, err := auth.NewEncryptedTokenForClient(&tokens, credentials.GetAccountAccessKey())
+	token, err := auth.NewEncryptedTokenForClient(&tokens, credentials.GetAccountAccessKey(), sessionFeatures)
 	if err != nil {
 		LogError("error authenticating user: %v", err)
 		return nil, errInvalidCredentials
@@ -89,15 +87,13 @@ func login(credentials ConsoleCredentialsI) (*string, error) {
 	return &token, nil
 }
 
-// getAccountPolicy will return the associated policy of the current account
-func getAccountPolicy(ctx context.Context, client MinioAdmin) (*iampolicy.Policy, error) {
-	// Obtain the current policy assigned to this user
-	// necessary for generating the list of allowed endpoints
+// getAccountInfo will return the current user information
+func getAccountInfo(ctx context.Context, client MinioAdmin) (*madmin.AccountInfo, error) {
 	accountInfo, err := client.AccountInfo(ctx)
 	if err != nil {
 		return nil, err
 	}
-	return iampolicy.ParseConfig(bytes.NewReader(accountInfo.Policy))
+	return &accountInfo, nil
 }
 
 // getConsoleCredentials will return ConsoleCredentials interface
@@ -115,11 +111,15 @@ func getConsoleCredentials(accessKey, secretKey string) (*ConsoleCredentials, er
 // getLoginResponse performs login() and serializes it to the handler's output
 func getLoginResponse(lr *models.LoginRequest) (*models.LoginResponse, *models.Error) {
 	// prepare console credentials
-	consolCreds, err := getConsoleCredentials(*lr.AccessKey, *lr.SecretKey)
+	consoleCreds, err := getConsoleCredentials(*lr.AccessKey, *lr.SecretKey)
 	if err != nil {
 		return nil, prepareError(err, errInvalidCredentials, err)
 	}
-	sessionID, err := login(consolCreds)
+	sf := &auth.SessionFeatures{}
+	if lr.Features != nil {
+		sf.HideMenu = lr.Features.HideMenu
+	}
+	sessionID, err := login(consoleCreds, sf)
 	if err != nil {
 		return nil, prepareError(err, errInvalidCredentials, err)
 	}
@@ -165,7 +165,7 @@ func verifyUserAgainstIDP(ctx context.Context, provider auth.IdentityProviderI, 
 }
 
 func getLoginOauth2AuthResponse(r *http.Request, lr *models.LoginOauth2AuthRequest) (*models.LoginResponse, *models.Error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	if oauth2.IsIDPEnabled() {
 		// initialize new oauth2 client
@@ -185,7 +185,7 @@ func getLoginOauth2AuthResponse(r *http.Request, lr *models.LoginOauth2AuthReque
 		token, err := login(&ConsoleCredentials{
 			ConsoleCredentials: userCredentials,
 			AccountAccessKey:   "",
-		})
+		}, nil)
 		if err != nil {
 			return nil, prepareError(err)
 		}

@@ -26,7 +26,7 @@ import {
   tenantDetailsStyles,
 } from "../../Common/FormComponents/common/styleLibrary";
 import Grid from "@mui/material/Grid";
-import { CircularProgress, DialogContentText } from "@mui/material";
+import { DialogContentText } from "@mui/material";
 import Paper from "@mui/material/Paper";
 import api from "../../../../common/api";
 import { ITenant } from "../ListTenants/types";
@@ -41,6 +41,7 @@ import ConfirmDialog from "../../Common/ModalWrapper/ConfirmDialog";
 import FormSwitchWrapper from "../../Common/FormComponents/FormSwitchWrapper/FormSwitchWrapper";
 import RBIconButton from "../../Buckets/BucketDetails/SummaryItems/RBIconButton";
 import { niceBytes } from "../../../../common/utils";
+import Loader from "../../Common/Loader/Loader";
 
 interface ITenantLogs {
   classes: any;
@@ -206,50 +207,59 @@ const TenantLogging = ({
           dbMemRequest={logInfo.logDBMemRequest}
         />
       )}
-      <h1 className={classes.sectionTitle}>Logging</h1>
-      <div className={classes.actionsTray}>
-        <FormSwitchWrapper
-          value="enableLogging"
-          id="enableLogging"
-          name="enableLogging"
-          checked={!preDisabled}
-          onChange={(e) => {
-            const targetD = e.target;
-            const checked = targetD.checked;
-            if (checked) {
-              setEnableDialogOpen(true);
-            } else {
-              setDisableDialogOpen(true);
-            }
-          }}
-          label={"Logging"}
-          indicatorLabels={["Enabled", "Disabled"]}
-        />
-        {!disabled && !loadingTenantLogs && (
-          <RBIconButton
-            tooltip={"Edit Logging configuration"}
-            text={"Edit"}
-            onClick={() => {
-              setEdit(true);
+      <Grid container alignItems={"center"}>
+        <Grid item xs>
+          <h1 className={classes.sectionTitle}>Logging</h1>
+        </Grid>
+        <Grid item xs={4}>
+          <FormSwitchWrapper
+            value="enableLogging"
+            id="enableLogging"
+            name="enableLogging"
+            checked={!preDisabled}
+            onChange={(e) => {
+              const targetD = e.target;
+              const checked = targetD.checked;
+              if (checked) {
+                setEnableDialogOpen(true);
+              } else {
+                setDisableDialogOpen(true);
+              }
             }}
-            icon={<EditIcon />}
-            color="primary"
-            variant={"contained"}
+            indicatorLabels={["Enabled", "Disabled"]}
           />
-        )}
-      </div>
+        </Grid>
+      </Grid>
       {!disabled && !loadingTenantLogs && (
         <Paper className={classes.paperContainer}>
           <Grid container>
             <Grid item xs={12}>
-              <h2>Logging API Service Details</h2>
+              <Grid container alignItems={"center"}>
+                <Grid xs={8}>
+                  <h3>Configuration</h3>
+                </Grid>
+                <Grid xs={4} justifyContent={"end"} textAlign={"right"}>
+                  <RBIconButton
+                    tooltip={"Edit Logging configuration"}
+                    text={"Edit"}
+                    onClick={() => {
+                      setEdit(true);
+                    }}
+                    icon={<EditIcon />}
+                    color="primary"
+                    variant={"contained"}
+                  />
+                </Grid>
+              </Grid>
+            </Grid>
+            <Grid item xs={12}>
               <hr className={classes.hrClass} />
               <table width={"100%"}>
                 <tbody>
                   {loadingTenant ? (
                     <tr>
                       <td className={classes.centerAlign} colSpan={4}>
-                        <CircularProgress />
+                        <Loader />
                       </td>
                     </tr>
                   ) : (
@@ -365,7 +375,7 @@ const TenantLogging = ({
                   {loadingTenant ? (
                     <tr>
                       <td className={classes.centerAlign} colSpan={4}>
-                        <CircularProgress />
+                        <Loader />
                       </td>
                     </tr>
                   ) : (

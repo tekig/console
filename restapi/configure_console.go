@@ -28,6 +28,7 @@ import (
 	"net"
 	"net/http"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -79,6 +80,7 @@ func configureAPI(api *operations.ConsoleAPI) http.Handler {
 			STSSecretAccessKey: claims.STSSecretAccessKey,
 			STSSessionToken:    claims.STSSessionToken,
 			AccountAccessKey:   claims.AccountAccessKey,
+			Hm:                 claims.HideMenu,
 		}, nil
 	}
 
@@ -106,6 +108,8 @@ func configureAPI(api *operations.ConsoleAPI) http.Handler {
 	registerProfilingHandler(api)
 	// Register session handlers
 	registerSessionHandlers(api)
+	// Register version handlers
+	registerVersionHandlers(api)
 	// Register admin info handlers
 	registerAdminInfoHandlers(api)
 	// Register admin arns handlers
@@ -122,6 +126,12 @@ func configureAPI(api *operations.ConsoleAPI) http.Handler {
 	registerSubnetHandlers(api)
 	// Register Account handlers
 	registerAdminTiersHandlers(api)
+	//Register Inspect Handler
+	registerInspectHandler(api)
+	// Register nodes handlers
+	registerNodesHandler(api)
+
+	registerSiteReplicationHandler(api)
 
 	// Operator Console
 
@@ -365,9 +375,16 @@ func getSubPath() string {
 }
 
 func replaceBaseInIndex(indexPageBytes []byte, basePath string) []byte {
-	indexPageStr := string(indexPageBytes)
-	newBase := fmt.Sprintf("<base href=\"%s\"/>", basePath)
-	indexPageStr = strings.Replace(indexPageStr, "<base href=\"/\"/>", newBase, 1)
-	indexPageBytes = []byte(indexPageStr)
+	if basePath != "" {
+		validBasePath := regexp.MustCompile(`^[0-9a-zA-Z\/-]+$`)
+		if !validBasePath.MatchString(basePath) {
+			return indexPageBytes
+		}
+		indexPageStr := string(indexPageBytes)
+		newBase := fmt.Sprintf("<base href=\"%s\"/>", basePath)
+		indexPageStr = strings.Replace(indexPageStr, "<base href=\"/\"/>", newBase, 1)
+		indexPageBytes = []byte(indexPageStr)
+
+	}
 	return indexPageBytes
 }

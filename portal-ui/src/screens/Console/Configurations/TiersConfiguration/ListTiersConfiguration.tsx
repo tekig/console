@@ -52,7 +52,7 @@ import {
   IAM_PAGES,
   IAM_SCOPES,
 } from "../../../../common/SecureComponent/permissions";
-import SecureComponent from "../../../../common/SecureComponent/SecureComponent";
+import { SecureComponent } from "../../../../common/SecureComponent";
 import { tierTypes } from "./utils";
 import RBIconButton from "../../Buckets/BucketDetails/SummaryItems/RBIconButton";
 
@@ -218,6 +218,36 @@ const ListTiersConfiguration = ({
     return "";
   };
 
+  const renderTierUsage = (item: ITierElement) => {
+    const endpoint = get(item, `${item.type}.usage`, "");
+
+    if (endpoint !== null) {
+      return endpoint;
+    }
+
+    return "";
+  };
+
+  const renderTierObjects = (item: ITierElement) => {
+    const endpoint = get(item, `${item.type}.objects`, "");
+
+    if (endpoint !== null) {
+      return endpoint;
+    }
+
+    return "";
+  };
+
+  const renderTierVersions = (item: ITierElement) => {
+    const endpoint = get(item, `${item.type}.versions`, "");
+
+    if (endpoint !== null) {
+      return endpoint;
+    }
+
+    return "";
+  };
+
   const closeTierCredentials = () => {
     setUpdateCredentialsOpen(false);
   };
@@ -330,6 +360,24 @@ const ListTiersConfiguration = ({
                               renderFunction: renderTierRegion,
                               renderFullObject: true,
                             },
+                            {
+                              label: "Usage",
+                              elementKey: "type",
+                              renderFunction: renderTierUsage,
+                              renderFullObject: true,
+                            },
+                            {
+                              label: "Objects",
+                              elementKey: "type",
+                              renderFunction: renderTierObjects,
+                              renderFullObject: true,
+                            },
+                            {
+                              label: "Versions",
+                              elementKey: "type",
+                              renderFunction: renderTierVersions,
+                              renderFullObject: true,
+                            },
                           ]}
                           isLoading={isLoading}
                           records={filteredRecords}
@@ -396,7 +444,7 @@ const ListTiersConfiguration = ({
                             <br />
                             <br />
                             To get started,{" "}
-                            <AButton onClick={addTier}>Add A Tier</AButton>.
+                            <AButton onClick={addTier}>Create Tier</AButton>.
                           </Fragment>
                         }
                       />

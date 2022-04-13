@@ -11,6 +11,8 @@ remove_users() {
   mc admin user remove minio bucketassignpolicy-$TIMESTAMP
   mc admin user remove minio bucketread-$TIMESTAMP
   mc admin user remove minio bucketwrite-$TIMESTAMP
+  mc admin user remove minio bucketobjecttags-$TIMESTAMP
+  mc admin user remove minio bucketcannottag-$TIMESTAMP
   mc admin user remove minio dashboard-$TIMESTAMP
   mc admin user remove minio diagnostics-$TIMESTAMP
   mc admin user remove minio groups-$TIMESTAMP
@@ -23,12 +25,16 @@ remove_users() {
   mc admin user remove minio trace-$TIMESTAMP
   mc admin user remove minio users-$TIMESTAMP
   mc admin user remove minio watch-$TIMESTAMP
+  mc admin user remove minio inspect-allowed-$TIMESTAMP
+  mc admin user remove minio inspect-not-allowed-$TIMESTAMP
+  mc admin user remove minio prefix-policy-ui-crash-$TIMESTAMP
 }
 
 remove_policies() {
   mc admin policy remove minio bucketassignpolicy-$TIMESTAMP
   mc admin policy remove minio bucketread-$TIMESTAMP
   mc admin policy remove minio bucketwrite-$TIMESTAMP
+  mc admin policy remove minio bucketcannottag-$TIMESTAMP
   mc admin policy remove minio dashboard-$TIMESTAMP
   mc admin policy remove minio diagnostics-$TIMESTAMP
   mc admin policy remove minio groups-$TIMESTAMP
@@ -41,6 +47,9 @@ remove_policies() {
   mc admin policy remove minio trace-$TIMESTAMP
   mc admin policy remove minio users-$TIMESTAMP
   mc admin policy remove minio watch-$TIMESTAMP
+  mc admin policy remove minio inspect-allowed-$TIMESTAMP
+  mc admin policy remove minio inspect-not-allowed-$TIMESTAMPmc
+  mc admin policy remove minio fix-prefix-policy-ui-crash-$TIMESTAMP
 }
 
 __init__() {
@@ -48,7 +57,8 @@ __init__() {
   export GOPATH=/tmp/gopath
   export PATH=${PATH}:${GOPATH}/bin
 
-  go install github.com/minio/mc@latest
+  wget https://dl.min.io/client/mc/release/linux-amd64/mc
+  chmod +x mc
 
   add_alias
 }

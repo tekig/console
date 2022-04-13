@@ -19,33 +19,50 @@ import { Theme } from "@mui/material/styles";
 import createStyles from "@mui/styles/createStyles";
 import withStyles from "@mui/styles/withStyles";
 import { connect } from "react-redux";
-import { Grid } from "@mui/material";
+import {
+  Grid,
+  FormControl,
+  MenuItem,
+  Select,
+  InputBase,
+  Button,
+} from "@mui/material";
+
 import moment from "moment/moment";
+import { ErrorResponseHandler } from "../../../../../src/common/types";
+import api from "../../../../../src/common/api";
 import { AppState } from "../../../../store";
-import { logMessageReceived, logResetMessages } from "../actions";
+import {
+  logMessageReceived,
+  logResetMessages,
+  setLogsStarted,
+} from "../actions";
 import { LogMessage } from "../types";
-import { timeFromDate } from "../../../../common/utils";
 import { wsProtocol } from "../../../../utils/wsUtils";
 import {
   actionsTray,
   containerForHeader,
   logsCommon,
   searchField,
+  inlineCheckboxes,
 } from "../../Common/FormComponents/common/styleLibrary";
 import PageHeader from "../../Common/PageHeader/PageHeader";
 import PageLayout from "../../Common/Layout/PageLayout";
 import SearchBox from "../../Common/SearchBox";
+import Paper from "@mui/material/Paper";
+import Table from "@mui/material/Table";
+import TableBody from "@mui/material/TableBody";
+import TableContainer from "@mui/material/TableContainer";
+import LogLine from "./LogLine";
 
 const styles = (theme: Theme) =>
   createStyles({
     logList: {
       background: "#fff",
       minHeight: 400,
-      height: "calc(100vh - 280px)",
+      height: "calc(100vh - 200px)",
       overflow: "auto",
       fontSize: 13,
-      padding: "15px 15px 0",
-      border: "1px solid #EAEDEE",
       borderRadius: 4,
     },
     tab: {
@@ -58,8 +75,19 @@ const styles = (theme: Theme) =>
       color: "#A52A2A",
       paddingLeft: 25,
     },
+    nodeField: {
+      width: "100%",
+    },
     ansidefault: {
       color: "#000",
+    },
+    midColumnCheckboxes: {
+      display: "flex",
+    },
+    checkBoxLabel: {
+      marginTop: 10,
+      fontSize: 16,
+      fontWeight: 500,
     },
     highlight: {
       "& span": {
@@ -67,27 +95,63 @@ const styles = (theme: Theme) =>
       },
     },
     ...actionsTray,
+    actionsTray: {
+      ...actionsTray.actionsTray,
+      marginBottom: 0,
+    },
     ...searchField,
     ...logsCommon,
+    ...inlineCheckboxes,
     ...containerForHeader(theme.spacing(4)),
   });
+
+const SelectStyled = withStyles((theme: Theme) =>
+  createStyles({
+    root: {
+      lineHeight: "50px",
+      "label + &": {
+        marginTop: theme.spacing(3),
+      },
+      "& .MuiSelect-select:focus": {
+        backgroundColor: "transparent",
+      },
+    },
+    input: {
+      height: 50,
+      fontSize: 13,
+      lineHeight: "50px",
+    },
+  })
+)(InputBase);
 
 interface ILogs {
   classes: any;
   logMessageReceived: typeof logMessageReceived;
   logResetMessages: typeof logResetMessages;
+  setLogsStarted: typeof setLogsStarted;
   messages: LogMessage[];
+  logsStarted: boolean;
 }
+var c: any = null;
 
 const ErrorLogs = ({
   classes,
   logMessageReceived,
   logResetMessages,
+  setLogsStarted,
   messages,
+  logsStarted,
 }: ILogs) => {
-  const [highlight, setHighlight] = useState("");
+  const [filter, setFilter] = useState<string>("");
+  const [nodes, setNodes] = useState<string[]>([""]);
+  const [selectedNode, setSelectedNode] = useState<string>("all");
+  const [selectedUserAgent, setSelectedUserAgent] =
+    useState<string>("Select user agent");
+  const [userAgents, setUserAgents] = useState<string[]>(["All User Agents"]);
+  const [logType, setLogType] = useState<string>("all");
+  const [loadingNodes, setLoadingNodes] = useState<boolean>(false);
 
-  useEffect(() => {
+  const startLogs = () => {
     logResetMessages();
     const url = new URL(window.location.toString());
     const isDev = process.env.NODE_ENV === "development";
@@ -95,14 +159,18 @@ const ErrorLogs = ({
 
     const wsProt = wsProtocol(url.protocol);
 
-    const c = new W3CWebSocket(
-      `${wsProt}://${url.hostname}:${port}/ws/console`
+    c = new W3CWebSocket(
+      `${wsProt}://${
+        url.hostname
+      }:${port}/ws/console/?logType=${logType}&node=${
+        selectedNode === "Select node" ? "" : selectedNode
+      }`
     );
-
     let interval: any | null = null;
     if (c !== null) {
       c.onopen = () => {
         console.log("WebSocket Client Connected");
+        setLogsStarted(true);
         c.send("ok");
         interval = setInterval(() => {
           c.send("ok");
@@ -111,235 +179,234 @@ const ErrorLogs = ({
       c.onmessage = (message: IMessageEvent) => {
         // console.log(message.data.toString())
         // FORMAT: 00:35:17 UTC 01/01/2021
+
         let m: LogMessage = JSON.parse(message.data.toString());
         m.time = moment(m.time, "HH:mm:s UTC MM/DD/YYYY").toDate();
         m.key = Math.random();
+        if (userAgents.indexOf(m.userAgent) < 0 && m.userAgent !== undefined) {
+          userAgents.push(m.userAgent);
+          setUserAgents(userAgents);
+        }
         logMessageReceived(m);
       };
       c.onclose = () => {
         clearInterval(interval);
         console.log("connection closed by server");
+        setLogsStarted(false);
       };
       return () => {
         c.close(1000);
         clearInterval(interval);
         console.log("closing websockets");
+        setLogsStarted(false);
       };
     }
-  }, [logMessageReceived, logResetMessages]);
+  };
 
-  const renderError = (logElement: LogMessage) => {
-    let errorElems = [];
-    if (logElement.error !== null && logElement.error !== undefined) {
-      if (logElement.api && logElement.api.name) {
-        const errorText = `API: ${logElement.api.name}`;
+  const stopLogs = () => {
+    if (c !== null && c !== undefined) {
+      c.close(1000);
+      setLogsStarted(false);
+    }
+  };
 
-        const highlightedLine =
-          highlight !== ""
-            ? errorText.toLowerCase().includes(highlight.toLowerCase())
-            : false;
-
-        errorElems.push(
-          <div
-            key={`api-${logElement.key}`}
-            className={`${highlightedLine ? classes.highlight : ""}`}
-          >
-            <br />
-            <span className={classes.logerror}>{errorText}</span>
-          </div>
-        );
-      }
-      if (logElement.time) {
-        const errorText = `Time: ${timeFromDate(logElement.time)}`;
-        const highlightedLine =
-          highlight !== ""
-            ? errorText.toLowerCase().includes(highlight.toLowerCase())
-            : false;
-        errorElems.push(
-          <div
-            key={`time-${logElement.key}`}
-            className={`${highlightedLine ? classes.highlight : ""}`}
-          >
-            <span className={classes.logerror}>{errorText}</span>
-          </div>
-        );
-      }
-      if (logElement.deploymentid) {
-        const errorText = `DeploymentID: ${logElement.deploymentid}`;
-        const highlightedLine =
-          highlight !== ""
-            ? errorText.toLowerCase().includes(highlight.toLowerCase())
-            : false;
-        errorElems.push(
-          <div
-            key={`deploytmentid-${logElement.key}`}
-            className={`${highlightedLine ? classes.highlight : ""}`}
-          >
-            <span className={classes.logerror}>{errorText}</span>
-          </div>
-        );
-      }
-      if (logElement.requestID) {
-        const errorText = `RequestID: ${logElement.requestID}`;
-        const highlightedLine =
-          highlight !== ""
-            ? errorText.toLowerCase().includes(highlight.toLowerCase())
-            : false;
-        errorElems.push(
-          <div
-            key={`requestid-${logElement.key}`}
-            className={`${highlightedLine ? classes.highlight : ""}`}
-          >
-            <span className={classes.logerror}>{errorText}</span>
-          </div>
-        );
-      }
-      if (logElement.remotehost) {
-        const errorText = `RemoteHost: ${logElement.remotehost}`;
-        const highlightedLine =
-          highlight !== ""
-            ? errorText.toLowerCase().includes(highlight.toLowerCase())
-            : false;
-        errorElems.push(
-          <div
-            key={`remotehost-${logElement.key}`}
-            className={`${highlightedLine ? classes.highlight : ""}`}
-          >
-            <span className={classes.logerror}>{errorText}</span>
-          </div>
-        );
-      }
-      if (logElement.host) {
-        const errorText = `Host: ${logElement.host}`;
-        const highlightedLine =
-          highlight !== ""
-            ? errorText.toLowerCase().includes(highlight.toLowerCase())
-            : false;
-        errorElems.push(
-          <div
-            key={`host-${logElement.key}`}
-            className={`${highlightedLine ? classes.highlight : ""}`}
-          >
-            <span className={classes.logerror}>{errorText}</span>
-          </div>
-        );
-      }
-      if (logElement.userAgent) {
-        const errorText = `UserAgent: ${logElement.userAgent}`;
-        const highlightedLine =
-          highlight !== ""
-            ? errorText.toLowerCase().includes(highlight.toLowerCase())
-            : false;
-        errorElems.push(
-          <div
-            key={`useragent-${logElement.key}`}
-            className={`${highlightedLine ? classes.highlight : ""}`}
-          >
-            <span className={classes.logerror}>{errorText}</span>
-          </div>
-        );
-      }
-      if (logElement.error.message) {
-        const errorText = `Error: ${logElement.error.message}`;
-        const highlightedLine =
-          highlight !== ""
-            ? errorText.toLowerCase().includes(highlight.toLowerCase())
-            : false;
-        errorElems.push(
-          <div
-            key={`message-${logElement.key}`}
-            className={`${highlightedLine ? classes.highlight : ""}`}
-          >
-            <span className={classes.logerror}>{errorText}</span>
-          </div>
-        );
-      }
-      if (logElement.error.source) {
-        // for all sources add padding
-        for (let s in logElement.error.source) {
-          const errorText = logElement.error.source[s];
-          const highlightedLine =
-            highlight !== ""
-              ? errorText.toLowerCase().includes(highlight.toLowerCase())
-              : false;
-          errorElems.push(
-            <div
-              key={`source-${logElement.key}-${s}`}
-              className={`${highlightedLine ? classes.highlight : ""}`}
-            >
-              <span className={classes.logerror_tab}>{errorText}</span>
-            </div>
-          );
+  const filtLow = filter.toLowerCase();
+  let filteredMessages = messages.filter((m) => {
+    if (
+      m.userAgent === selectedUserAgent ||
+      selectedUserAgent === "All User Agents" ||
+      selectedUserAgent === "Select user agent"
+    ) {
+      if (filter !== "") {
+        if (m.ConsoleMsg.toLowerCase().indexOf(filtLow) >= 0) {
+          return true;
+        } else if (
+          m.error &&
+          m.error.source &&
+          m.error.source.filter((x) => {
+            return x.toLowerCase().indexOf(filtLow) >= 0;
+          }).length > 0
+        ) {
+          return true;
+        } else if (
+          m.error &&
+          m.error.message.toLowerCase().indexOf(filtLow) >= 0
+        ) {
+          return true;
+        } else if (m.api && m.api.name.toLowerCase().indexOf(filtLow) >= 0) {
+          return true;
         }
+        return false;
       }
-    }
-    return errorElems;
-  };
-
-  const renderLog = (logElement: LogMessage) => {
-    let logMessage = logElement.ConsoleMsg;
-    // remove any non ascii characters, exclude any control codes
-    logMessage = logMessage.replace(/([^\x20-\x7F])/g, "");
-
-    // regex for terminal colors like e.g. `[31;4m `
-    const tColorRegex = /((\[[0-9;]+m))/g;
-
-    // get substring if there was a match for to split what
-    // is going to be colored and what not, here we add color
-    // only to the first match.
-    let substr = logMessage.replace(tColorRegex, "");
-
-    // in case highlight is set, we select the line that contains the requested string
-    let highlightedLine =
-      highlight !== ""
-        ? logMessage.toLowerCase().includes(highlight.toLowerCase())
-        : false;
-
-    // if starts with multiple spaces add padding
-    if (substr.startsWith("   ")) {
-      return (
-        <div
-          key={logElement.key}
-          className={`${highlightedLine ? classes.highlight : ""}`}
-        >
-          <span className={classes.tab}>{substr}</span>
-        </div>
-      );
-    } else if (logElement.error !== null && logElement.error !== undefined) {
-      // list error message and all sources and error elems
-      return renderError(logElement);
-    } else {
-      // for all remaining set default class
-      return (
-        <div
-          key={logElement.key}
-          className={`${highlightedLine ? classes.highlight : ""}`}
-        >
-          <span className={classes.ansidefault}>{substr}</span>
-        </div>
-      );
-    }
-  };
-
-  const renderLines = messages.map((m) => {
-    return renderLog(m);
+      return true;
+    } else return false;
   });
+
+  useEffect(() => {
+    setLoadingNodes(true);
+    api
+      .invoke("GET", `/api/v1/nodes`)
+      .then((res: string[]) => {
+        setNodes(res);
+        // if (res.length > 0) {
+        //   setSelectedNode(res[0]);
+        // }
+        setLoadingNodes(false);
+      })
+      .catch((err: ErrorResponseHandler) => {
+        setLoadingNodes(false);
+      });
+  }, []);
 
   return (
     <Fragment>
       <PageHeader label="Logs" />
       <PageLayout>
-        <Grid xs={12}>
+        <Grid container spacing={1}>
+          <Grid item xs={4}>
+            {!loadingNodes ? (
+              <FormControl variant="outlined" className={classes.nodeField}>
+                <Select
+                  id="node"
+                  name="node"
+                  data-test-id="node-selector"
+                  value={selectedNode}
+                  onChange={(e) => {
+                    setSelectedNode(e.target.value as string);
+                  }}
+                  className={classes.searchField}
+                  disabled={loadingNodes || logsStarted}
+                  input={<SelectStyled />}
+                  placeholder={"Select Node"}
+                >
+                  <MenuItem value={"all"} key={`select-node-all`}>
+                    All Nodes
+                  </MenuItem>
+                  {nodes.map((aNode) => (
+                    <MenuItem value={aNode} key={`select-node-name-${aNode}`}>
+                      {aNode}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            ) : (
+              <h3> Loading nodes</h3>
+            )}
+          </Grid>
+
+          <Grid item xs={3}>
+            <FormControl variant="outlined" className={classes.nodeField}>
+              <Select
+                id="logType"
+                name="logType"
+                data-test-id="log-type"
+                value={logType}
+                onChange={(e) => {
+                  setLogType(e.target.value as string);
+                }}
+                className={classes.searchField}
+                disabled={loadingNodes || logsStarted}
+                input={<SelectStyled />}
+                placeholder={"Select Log Type"}
+              >
+                <MenuItem value="all" key="all-log-types">
+                  All Log Types
+                </MenuItem>
+                <MenuItem value="minio" key="minio-log-type">
+                  MinIO
+                </MenuItem>
+                <MenuItem value="application" key="app-log-type">
+                  Application
+                </MenuItem>
+              </Select>
+            </FormControl>
+          </Grid>
+          <Grid item xs={3}>
+            {userAgents.length > 1 && (
+              <FormControl variant="outlined" className={classes.nodeField}>
+                <Select
+                  id="userAgent"
+                  name="userAgent"
+                  data-test-id="user-agent"
+                  value={selectedUserAgent}
+                  onChange={(e) => {
+                    setSelectedUserAgent(e.target.value as string);
+                  }}
+                  className={classes.searchField}
+                  disabled={userAgents.length < 1 || logsStarted}
+                  input={<SelectStyled />}
+                >
+                  <MenuItem
+                    value={selectedUserAgent}
+                    key={`select-user-agent-default`}
+                    disabled={true}
+                  >
+                    Select User Agent
+                  </MenuItem>
+                  {userAgents.map((anAgent) => (
+                    <MenuItem
+                      value={anAgent}
+                      key={`select-user-agent-${anAgent}`}
+                    >
+                      {anAgent}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            )}
+          </Grid>
+          <Grid item xs={2} textAlign={"right"}>
+            {!logsStarted && (
+              <Button
+                type="submit"
+                variant="contained"
+                color="primary"
+                disabled={false}
+                onClick={startLogs}
+              >
+                Start Logs
+              </Button>
+            )}
+            {logsStarted && (
+              <Button
+                type="button"
+                variant="contained"
+                color="primary"
+                onClick={stopLogs}
+              >
+                Stop Logs
+              </Button>
+            )}
+          </Grid>
           <Grid item xs={12} className={classes.actionsTray}>
             <SearchBox
-              placeholder="Highlight Line"
-              onChange={setHighlight}
-              value={highlight}
+              placeholder="Filter"
+              onChange={(e) => {
+                setFilter(e);
+              }}
+              value={filter}
             />
           </Grid>
           <Grid item xs={12}>
-            <div id="logs-container" className={classes.logList}>
-              {renderLines}
+            <div
+              id="logs-container"
+              className={classes.logList}
+              data-test-id="logs-list-container"
+            >
+              <TableContainer component={Paper}>
+                <Table aria-label="collapsible table">
+                  <TableBody>
+                    {filteredMessages.map((m) => {
+                      return <LogLine log={m} />;
+                    })}
+                  </TableBody>
+                </Table>
+                {filteredMessages.length === 0 && (
+                  <div style={{ padding: 20, textAlign: "center" }}>
+                    No logs to display
+                  </div>
+                )}
+              </TableContainer>
             </div>
           </Grid>
         </Grid>
@@ -349,12 +416,15 @@ const ErrorLogs = ({
 };
 
 const mapState = (state: AppState) => ({
-  messages: state.logs.messages,
+  messages: state.logs.logMessages,
+  logsStarted: state.logs.logsStarted,
 });
 
 const connector = connect(mapState, {
   logMessageReceived: logMessageReceived,
   logResetMessages: logResetMessages,
+  setLogsStarted,
 });
 
-export default withStyles(styles)(connector(ErrorLogs));
+//export default withStyles(styles)(connector(ErrorLogs));
+export default connector(withStyles(styles)(ErrorLogs));

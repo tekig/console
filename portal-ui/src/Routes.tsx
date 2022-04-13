@@ -17,11 +17,10 @@
 import React, { Suspense } from "react";
 import { Route, Router, Switch } from "react-router-dom";
 import history from "./history";
-
-import Console from "./screens/Console/Console";
 import { hot } from "react-hot-loader/root";
 import ProtectedRoute from "./ProtectedRoutes";
 import LoadingComponent from "./common/LoadingComponent";
+import AppConsole from "./screens/Console/ConsoleKBar";
 
 const Login = React.lazy(() => import("./screens/LoginPage/LoginPage"));
 const LoginCallback = React.lazy(
@@ -45,12 +44,27 @@ const Routes = () => {
           exact
           path="/login"
           children={(routerProps) => (
-            <Suspense fallback={<LoadingComponent />}>
-              <Login />
-            </Suspense>
+            <div
+              style={{
+                backgroundImage: `url('/images/background-wave-orig2.svg'), url('/images/background.svg')`,
+                backgroundPosition: "center 250px, center center",
+                backgroundRepeat: "no-repeat",
+                backgroundSize: "2547px 980px,cover",
+                backgroundBlendMode: "color-dodge",
+                width: "100%",
+                height: "100%",
+                display: "flex",
+                color: "#fff",
+                overflow: "auto",
+              }}
+            >
+              <Suspense fallback={<LoadingComponent />}>
+                <Login />
+              </Suspense>
+            </div>
           )}
         />
-        <ProtectedRoute Component={Console} />
+        <ProtectedRoute Component={AppConsole} />
       </Switch>
     </Router>
   );

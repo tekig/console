@@ -22,8 +22,12 @@ import withStyles from "@mui/styles/withStyles";
 import { LinearProgress } from "@mui/material";
 import Grid from "@mui/material/Grid";
 import { Bucket, BucketList } from "../types";
-import { AddIcon, BucketsIcon } from "../../../../icons";
-import { AppState } from "../../../../store";
+import {
+  AddIcon,
+  BucketsIcon,
+  LifecycleConfigIcon,
+  SelectAllIcon,
+} from "../../../../icons";
 import { setErrorSnackMessage } from "../../../../actions";
 import {
   containerForHeader,
@@ -31,17 +35,15 @@ import {
 } from "../../Common/FormComponents/common/styleLibrary";
 import { ErrorResponseHandler } from "../../../../common/types";
 import api from "../../../../common/api";
-import DeleteBucket from "./DeleteBucket";
 import PageHeader from "../../Common/PageHeader/PageHeader";
 import BucketListItem from "./BucketListItem";
 import BulkReplicationModal from "./BulkReplicationModal";
 import HelpBox from "../../../../common/HelpBox";
-import { ISessionResponse } from "../../types";
 import RefreshIcon from "../../../../icons/RefreshIcon";
 import AButton from "../../Common/AButton/AButton";
 import MultipleBucketsIcon from "../../../../icons/MultipleBucketsIcon";
 import SelectMultipleIcon from "../../../../icons/SelectMultipleIcon";
-import SecureComponent from "../../../../common/SecureComponent/SecureComponent";
+import { SecureComponent } from "../../../../common/SecureComponent";
 import {
   CONSOLE_UI_RESOURCE,
   IAM_SCOPES,
@@ -50,6 +52,8 @@ import PageLayout from "../../Common/Layout/PageLayout";
 import SearchBox from "../../Common/SearchBox";
 import VirtualizedList from "../../Common/VirtualizedList/VirtualizedList";
 import RBIconButton from "../BucketDetails/SummaryItems/RBIconButton";
+import BulkLifecycleModal from "./BulkLifecycleModal";
+import hasPermission from "../../../../common/SecureComponent/accessControl";
 
 const styles = (theme: Theme) =>
   createStyles({
@@ -83,23 +87,20 @@ interface IListBucketsProps {
   classes: any;
   history: any;
   setErrorSnackMessage: typeof setErrorSnackMessage;
-  session: ISessionResponse;
 }
 
 const ListBuckets = ({
   classes,
   history,
   setErrorSnackMessage,
-  session,
 }: IListBucketsProps) => {
   const [records, setRecords] = useState<Bucket[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
-  const [deleteOpen, setDeleteOpen] = useState<boolean>(false);
-  const [selectedBucket, setSelectedBucket] = useState<string>("");
   const [filterBuckets, setFilterBuckets] = useState<string>("");
   const [selectedBuckets, setSelectedBuckets] = useState<string[]>([]);
   const [replicationModalOpen, setReplicationModalOpen] =
     useState<boolean>(false);
+  const [lifecycleModalOpen, setLifecycleModalOpen] = useState<boolean>(false);
 
   const [bulkSelect, setBulkSelect] = useState<boolean>(false);
 
@@ -122,28 +123,11 @@ const ListBuckets = ({
     }
   }, [loading, setErrorSnackMessage]);
 
-  const closeDeleteModalAndRefresh = (refresh: boolean) => {
-    setDeleteOpen(false);
-    if (refresh) {
-      setLoading(true);
-      setSelectedBuckets([]);
-    }
-  };
-
-  const confirmDeleteBucket = (bucket: string) => {
-    setDeleteOpen(true);
-    setSelectedBucket(bucket);
-  };
-
   const filteredRecords = records.filter((b: Bucket) => {
     if (filterBuckets === "") {
       return true;
     } else {
-      if (b.name.indexOf(filterBuckets) >= 0) {
-        return true;
-      } else {
-        return false;
-      }
+      return b.name.indexOf(filterBuckets) >= 0;
     }
   });
 
@@ -174,40 +158,58 @@ const ListBuckets = ({
     }
   };
 
+  const closeBulkLifecycleModal = (unselectAll: boolean) => {
+    setLifecycleModalOpen(false);
+
+    if (unselectAll) {
+      setSelectedBuckets([]);
+    }
+  };
+
   const renderItemLine = (index: number) => {
     const bucket = filteredRecords[index] || null;
-
     if (bucket) {
       return (
         <BucketListItem
           bucket={bucket}
-          onDelete={confirmDeleteBucket}
           onSelect={selectListBuckets}
           selected={selectedBuckets.includes(bucket.name)}
           bulkSelect={bulkSelect}
         />
       );
     }
-
     return null;
   };
 
+  const selectAllBuckets = () => {
+    if (selectedBuckets.length === filteredRecords.length) {
+      setSelectedBuckets([]);
+      return;
+    }
+
+    const selectAllBuckets = filteredRecords.map((bucket) => {
+      return bucket.name;
+    });
+
+    setSelectedBuckets(selectAllBuckets);
+  };
+
+  const canCreateBucket = hasPermission("*", [IAM_SCOPES.S3_CREATE_BUCKET]);
+
   return (
     <Fragment>
-      {deleteOpen && (
-        <DeleteBucket
-          deleteOpen={deleteOpen}
-          selectedBucket={selectedBucket}
-          closeDeleteModalAndRefresh={(refresh: boolean) => {
-            closeDeleteModalAndRefresh(refresh);
-          }}
-        />
-      )}
       {replicationModalOpen && (
         <BulkReplicationModal
           open={replicationModalOpen}
           buckets={selectedBuckets}
           closeModalAndRefresh={closeBulkReplicationModal}
+        />
+      )}
+      {lifecycleModalOpen && (
+        <BulkLifecycleModal
+          buckets={selectedBuckets}
+          closeModalAndRefresh={closeBulkLifecycleModal}
+          open={lifecycleModalOpen}
         />
       )}
       <PageHeader label={"Buckets"} />
@@ -228,14 +230,44 @@ const ListBuckets = ({
             justifyContent={"flex-end"}
           >
             <RBIconButton
-              tooltip={bulkSelect ? "Un Select All" : "Select Multiple"}
+              tooltip={
+                bulkSelect ? "Unselect Buckets" : "Select Multiple Buckets"
+              }
               onClick={() => {
                 setBulkSelect(!bulkSelect);
+                setSelectedBuckets([]);
               }}
               text={""}
               icon={<SelectMultipleIcon />}
               color={"primary"}
               variant={bulkSelect ? "contained" : "outlined"}
+            />
+
+            {bulkSelect && (
+              <RBIconButton
+                tooltip={
+                  selectedBuckets.length === filteredRecords.length
+                    ? "Unselect All Buckets"
+                    : "Select All Buckets"
+                }
+                onClick={selectAllBuckets}
+                text={""}
+                icon={<SelectAllIcon />}
+                color={"primary"}
+                variant={"outlined"}
+              />
+            )}
+
+            <RBIconButton
+              tooltip={"Set Lifecycle"}
+              onClick={() => {
+                setLifecycleModalOpen(true);
+              }}
+              text={""}
+              icon={<LifecycleConfigIcon />}
+              disabled={selectedBuckets.length === 0}
+              color={"primary"}
+              variant={"outlined"}
             />
 
             <RBIconButton
@@ -261,22 +293,17 @@ const ListBuckets = ({
               variant={"outlined"}
             />
 
-            <SecureComponent
-              scopes={[IAM_SCOPES.S3_CREATE_BUCKET]}
-              resource={CONSOLE_UI_RESOURCE}
-              errorProps={{ disabled: true }}
-            >
-              <RBIconButton
-                tooltip={"Create Bucket"}
-                onClick={() => {
-                  history.push("/add-bucket");
-                }}
-                text={"Create Bucket"}
-                icon={<AddIcon />}
-                color={"primary"}
-                variant={"contained"}
-              />
-            </SecureComponent>
+            <RBIconButton
+              tooltip={"Create Bucket"}
+              onClick={() => {
+                history.push("/add-bucket");
+              }}
+              text={"Create Bucket"}
+              icon={<AddIcon />}
+              color={"primary"}
+              variant={"contained"}
+              disabled={!canCreateBucket}
+            />
           </Grid>
         </Grid>
 
@@ -353,11 +380,7 @@ const ListBuckets = ({
   );
 };
 
-const mapState = (state: AppState) => ({
-  session: state.console.session,
-});
-
-const connector = connect(mapState, {
+const connector = connect(null, {
   setErrorSnackMessage,
 });
 

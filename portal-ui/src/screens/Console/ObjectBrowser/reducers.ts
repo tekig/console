@@ -16,7 +16,7 @@
 import {
   REWIND_SET_ENABLE,
   REWIND_RESET_REWIND,
-  REWIND_FILE_MODE_ENABLED,
+  BUCKET_BROWSER_VERSIONS_MODE_ENABLED,
   ObjectBrowserActionTypes,
   OBJECT_MANAGER_NEW_OBJECT,
   OBJECT_MANAGER_UPDATE_PROGRESS_OBJECT,
@@ -27,6 +27,11 @@ import {
   OBJECT_MANAGER_CLOSE_LIST,
   OBJECT_MANAGER_OPEN_LIST,
   OBJECT_MANAGER_SET_SEARCH_OBJECT,
+  BUCKET_BROWSER_VERSIONS_SET_SEARCH,
+  BUCKET_BROWSER_SET_SELECTED_VERSION,
+  BUCKET_BROWSER_SHOW_DELETED,
+  BUCKET_BROWSER_LOAD_VERSIONS,
+  BUCKET_BROWSER_LOAD_OBJECT_DETAILS,
 } from "./actions";
 
 export interface Route {
@@ -42,10 +47,16 @@ export interface RewindItem {
 }
 
 export interface ObjectBrowserState {
-  fileMode: boolean;
   rewind: RewindItem;
   objectManager: ObjectManager;
   searchObjects: string;
+  loadingVersions: boolean;
+  loadingObjectInfo: boolean;
+  versionsMode: boolean;
+  versionedFile: string;
+  searchVersions: string;
+  selectedVersion: string;
+  showDeleted: boolean;
 }
 
 export interface ObjectBrowserReducer {
@@ -74,7 +85,9 @@ const defaultRewind = {
 };
 
 const initialState: ObjectBrowserState = {
-  fileMode: false,
+  versionsMode: false,
+  loadingVersions: true,
+  loadingObjectInfo: true,
   rewind: {
     ...defaultRewind,
   },
@@ -83,6 +96,10 @@ const initialState: ObjectBrowserState = {
     managerOpen: false,
   },
   searchObjects: "",
+  versionedFile: "",
+  searchVersions: "",
+  selectedVersion: "",
+  showDeleted: false,
 };
 
 export function objectBrowserReducer(
@@ -105,8 +122,15 @@ export function objectBrowserReducer(
         dateToRewind: null,
       };
       return { ...state, rewind: resetItem };
-    case REWIND_FILE_MODE_ENABLED:
-      return { ...state, fileMode: action.status };
+    case BUCKET_BROWSER_VERSIONS_MODE_ENABLED:
+      const objectN = !action.status ? "" : action.objectName;
+
+      return {
+        ...state,
+        versionsMode: action.status,
+        versionedFile: objectN,
+        selectedVersion: "",
+      };
     case OBJECT_MANAGER_NEW_OBJECT:
       const cloneObjects = [
         action.newObject,
@@ -178,7 +202,7 @@ export function objectBrowserReducer(
       };
     case OBJECT_MANAGER_CLEAN_LIST:
       const nonCompletedList = state.objectManager.objectsToManage.filter(
-        (item) => !item.done
+        (item) => item.percentage !== 100
       );
 
       return {
@@ -219,6 +243,31 @@ export function objectBrowserReducer(
       return {
         ...state,
         searchObjects: action.searchString,
+      };
+    case BUCKET_BROWSER_VERSIONS_SET_SEARCH:
+      return {
+        ...state,
+        searchVersions: action.searchString,
+      };
+    case BUCKET_BROWSER_SET_SELECTED_VERSION:
+      return {
+        ...state,
+        selectedVersion: action.selectedVersion,
+      };
+    case BUCKET_BROWSER_SHOW_DELETED:
+      return {
+        ...state,
+        showDeleted: action.status,
+      };
+    case BUCKET_BROWSER_LOAD_VERSIONS:
+      return {
+        ...state,
+        loadingVersions: action.status,
+      };
+    case BUCKET_BROWSER_LOAD_OBJECT_DETAILS:
+      return {
+        ...state,
+        loadingObjectInfo: action.status,
       };
     default:
       return state;

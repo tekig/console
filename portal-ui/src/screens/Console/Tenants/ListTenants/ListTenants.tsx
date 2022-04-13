@@ -95,13 +95,7 @@ const styles = (theme: Theme) =>
       marginBottom: 8,
     },
     tenantsList: {
-      marginTop: 25,
       height: "calc(100vh - 195px)",
-    },
-    searchField: {
-      ...searchField.searchField,
-      marginRight: "auto",
-      maxWidth: 380,
     },
   });
 
@@ -191,23 +185,19 @@ const ListTenants = ({ classes, setErrorSnackMessage }: ITenantsList) => {
       )}
       <PageHeader
         label="Tenants"
+        middleComponent={
+          <SearchBox
+            placeholder={"Filter Tenants"}
+            onChange={(val) => {
+              setFilterTenants(val);
+            }}
+            value={filterTenants}
+          />
+        }
         actions={
-          <Grid
-            item
-            xs={12}
-            className={classes.actionsTray}
-            marginRight={"30px"}
-          >
-            <SearchBox
-              placeholder={"Filter Tenants"}
-              onChange={(val) => {
-                setFilterTenants(val);
-              }}
-              overrideClass={classes.searchField}
-              value={filterTenants}
-            />
-
+          <Grid item xs={12} marginRight={"30px"}>
             <RBIconButton
+              id={"refresh-tenant-list"}
               tooltip={"Refresh Tenant List"}
               text={""}
               onClick={() => {
@@ -218,6 +208,7 @@ const ListTenants = ({ classes, setErrorSnackMessage }: ITenantsList) => {
               variant={"outlined"}
             />
             <RBIconButton
+              id={"create-tenant"}
               tooltip={"Create Tenant"}
               text={"Create Tenant"}
               onClick={() => {

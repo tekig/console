@@ -33,7 +33,6 @@ import DeleteGroup from "./DeleteGroup";
 import VerticalTabs from "../Common/VerticalTabs/VerticalTabs";
 import FormSwitchWrapper from "../Common/FormComponents/FormSwitchWrapper/FormSwitchWrapper";
 import PageLayout from "../Common/Layout/PageLayout";
-import BackLink from "../../../common/BackLink";
 import PanelTitle from "../Common/PanelTitle/PanelTitle";
 import SearchBox from "../Common/SearchBox";
 import {
@@ -41,9 +40,10 @@ import {
   IAM_PAGES,
   IAM_SCOPES,
 } from "../../../common/SecureComponent/permissions";
-import SecureComponent, {
+import {
+  SecureComponent,
   hasPermission,
-} from "../../../common/SecureComponent/SecureComponent";
+} from "../../../common/SecureComponent";
 import GroupDetailsHeader from "./GroupDetailsHeader";
 import RBIconButton from "../Buckets/BucketDetails/SummaryItems/RBIconButton";
 
@@ -222,7 +222,7 @@ const GroupsDetails = ({ classes }: IGroupDetailsProps) => {
               {
                 type: "view",
                 onClick: (userName) => {
-                  history.push(`${IAM_PAGES.USERS_VIEW}/${userName}`);
+                  history.push(`${IAM_PAGES.USERS}/${userName}`);
                 },
               },
             ]}
@@ -276,7 +276,6 @@ const GroupsDetails = ({ classes }: IGroupDetailsProps) => {
   return (
     <React.Fragment>
       <GroupDetailsHeader />
-      <BackLink to={IAM_PAGES.GROUPS} label={"Return to Groups"} />
 
       <PageLayout className={classes.pageContainer}>
         <Grid item xs={12}>

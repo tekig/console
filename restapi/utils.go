@@ -20,7 +20,6 @@ import (
 	"crypto/rand"
 	"io"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
@@ -98,15 +97,6 @@ func UniqueKeys(a []string) []string {
 	return list
 }
 
-// FileExists verifies if a file exist on the desired location and its not a folder
-func FileExists(filename string) bool {
-	info, err := os.Stat(filename)
-	if os.IsNotExist(err) {
-		return false
-	}
-	return !info.IsDir()
-}
-
 func NewSessionCookieForConsole(token string) http.Cookie {
 	sessionDuration := xjwt.GetConsoleSTSDuration()
 	return http.Cookie{
@@ -143,4 +133,47 @@ func ExpireSessionCookie() http.Cookie {
 // SanitizeEncodedPrefix replaces spaces for + since those are lost when you do GET parameters
 func SanitizeEncodedPrefix(rawPrefix string) string {
 	return strings.Replace(rawPrefix, " ", "+", -1)
+}
+
+var safeMimeTypes = []string{
+	"image/jpeg",
+	"image/apng",
+	"image/avif",
+	"image/webp",
+	"image/bmp",
+	"image/x-icon",
+	"image/gif",
+	"image/png",
+	"image/heic",
+	"image/heif",
+	"application/pdf",
+	"text/plain",
+	"application/json",
+	"audio/wav",
+	"audio/mpeg",
+	"audio/aiff",
+	"audio/dsd",
+	"video/mp4",
+	"video/x-msvideo",
+	"video/mpeg",
+	"audio/webm",
+	"video/webm",
+	"video/quicktime",
+	"video/x-flv",
+	"audio/x-matroska",
+	"video/x-matroska",
+	"video/x-ms-wmv",
+	"application/metastream",
+	"video/avchd-stream",
+	"audio/mp4",
+	"video/mp4",
+}
+
+func isSafeToPreview(str string) bool {
+	for _, v := range safeMimeTypes {
+		if v == str {
+			return true
+		}
+	}
+	return false
 }

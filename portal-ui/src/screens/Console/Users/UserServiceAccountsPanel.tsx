@@ -17,6 +17,7 @@
 import React, { useEffect, useState } from "react";
 import { connect } from "react-redux";
 import { Theme } from "@mui/material/styles";
+import { Box } from "@mui/material";
 import createStyles from "@mui/styles/createStyles";
 import withStyles from "@mui/styles/withStyles";
 import {
@@ -27,16 +28,19 @@ import {
 import api from "../../../common/api";
 import TableWrapper from "../Common/TableWrapper/TableWrapper";
 import { AppState } from "../../../store";
-import { setErrorSnackMessage } from "../../../actions";
+import { setErrorSnackMessage, setSnackBarMessage } from "../../../actions";
 import { NewServiceAccount } from "../Common/CredentialsPrompt/types";
 import { stringSort } from "../../../utils/sortFunctions";
 import { ErrorResponseHandler } from "../../../common/types";
 import AddUserServiceAccount from "./AddUserServiceAccount";
 import DeleteServiceAccount from "../Account/DeleteServiceAccount";
 import CredentialsPrompt from "../Common/CredentialsPrompt/CredentialsPrompt";
-import { AddIcon } from "../../../icons";
+import { AddIcon, DeleteIcon } from "../../../icons";
 import PanelTitle from "../Common/PanelTitle/PanelTitle";
 import RBIconButton from "../Buckets/BucketDetails/SummaryItems/RBIconButton";
+import DeleteMultipleServiceAccounts from "./DeleteMultipleServiceAccounts";
+import { selectSAs } from "../../Console/Configurations/utils";
+import ServiceAccountPolicy from "../Account/ServiceAccountPolicy";
 
 interface IUserServiceAccountsProps {
   classes: any;
@@ -71,6 +75,9 @@ const UserServiceAccountsPanel = ({
   const [showNewCredentials, setShowNewCredentials] = useState<boolean>(false);
   const [newServiceAccount, setNewServiceAccount] =
     useState<NewServiceAccount | null>(null);
+  const [selectedSAs, setSelectedSAs] = useState<string[]>([]);
+  const [deleteMultipleOpen, setDeleteMultipleOpen] = useState<boolean>(false);
+  const [policyOpen, setPolicyOpen] = useState<boolean>(false);
 
   useEffect(() => {
     fetchRecords();
@@ -105,6 +112,7 @@ const UserServiceAccountsPanel = ({
         console: {
           accessKey: `${res.accessKey}`,
           secretKey: `${res.secretKey}`,
+          url: `${res.url}`,
         },
       };
       setNewServiceAccount(nsa);
@@ -120,9 +128,31 @@ const UserServiceAccountsPanel = ({
     }
   };
 
+  const closeDeleteMultipleModalAndRefresh = (refresh: boolean) => {
+    setDeleteMultipleOpen(false);
+    if (refresh) {
+      setSnackBarMessage(`Service accounts deleted successfully.`);
+      setSelectedSAs([]);
+      setLoading(true);
+    }
+  };
+
+  const selectAllItems = () => {
+    if (selectedSAs.length === records.length) {
+      setSelectedSAs([]);
+      return;
+    }
+    setSelectedSAs(records);
+  };
+
   const closeCredentialsModal = () => {
     setShowNewCredentials(false);
     setNewServiceAccount(null);
+  };
+
+  const policyModalOpen = (selectedServiceAccount: string) => {
+    setSelectedServiceAccount(selectedServiceAccount);
+    setPolicyOpen(true);
   };
 
   const confirmDeleteServiceAccount = (selectedServiceAccount: string) => {
@@ -130,7 +160,13 @@ const UserServiceAccountsPanel = ({
     setDeleteOpen(true);
   };
 
+  const closePolicyModal = () => {
+    setPolicyOpen(false);
+    setLoading(true);
+  };
+
   const tableActions = [
+    { type: "view", onClick: policyModalOpen },
     { type: "delete", onClick: confirmDeleteServiceAccount },
   ];
 
@@ -154,6 +190,13 @@ const UserServiceAccountsPanel = ({
           }}
         />
       )}
+      {deleteMultipleOpen && (
+        <DeleteMultipleServiceAccounts
+          deleteOpen={deleteMultipleOpen}
+          selectedSAs={selectedSAs}
+          closeDeleteModalAndRefresh={closeDeleteMultipleModalAndRefresh}
+        />
+      )}
       {showNewCredentials && (
         <CredentialsPrompt
           newServiceAccount={newServiceAccount}
@@ -164,22 +207,41 @@ const UserServiceAccountsPanel = ({
           entity="Service Account"
         />
       )}
+      {policyOpen && (
+        <ServiceAccountPolicy
+          open={policyOpen}
+          selectedAccessKey={selectedServiceAccount}
+          closeModalAndRefresh={closePolicyModal}
+        />
+      )}
       <div className={classes.actionsTray}>
         <PanelTitle>Service Accounts</PanelTitle>
-
-        <RBIconButton
-          tooltip={"Create service account"}
-          text={"Create service account"}
-          variant="contained"
-          color="primary"
-          icon={<AddIcon />}
-          onClick={() => {
-            setAddScreenOpen(true);
-            setAddScreenOpen(true);
-            setSelectedServiceAccount(null);
-          }}
-          disabled={!hasPolicy}
-        />
+        <Box>
+          <RBIconButton
+            tooltip={"Delete Selected"}
+            onClick={() => {
+              setDeleteMultipleOpen(true);
+            }}
+            text={"Delete Selected"}
+            icon={<DeleteIcon />}
+            color="secondary"
+            disabled={selectedSAs.length === 0}
+            variant={"outlined"}
+          />
+          <RBIconButton
+            tooltip={"Create service account"}
+            text={"Create service account"}
+            variant="contained"
+            color="primary"
+            icon={<AddIcon />}
+            onClick={() => {
+              setAddScreenOpen(true);
+              setAddScreenOpen(true);
+              setSelectedServiceAccount(null);
+            }}
+            disabled={!hasPolicy}
+          />
+        </Box>
       </div>
       <div className={classes.tableBlock}>
         <TableWrapper
@@ -189,6 +251,9 @@ const UserServiceAccountsPanel = ({
           idField={""}
           columns={[{ label: "Service Account", elementKey: "" }]}
           itemActions={tableActions}
+          selectedItems={selectedSAs}
+          onSelect={(e) => selectSAs(e, setSelectedSAs, selectedSAs)}
+          onSelectAll={selectAllItems}
         />
       </div>
     </React.Fragment>

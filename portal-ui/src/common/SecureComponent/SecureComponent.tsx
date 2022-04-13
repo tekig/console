@@ -15,40 +15,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import React, { cloneElement } from "react";
-import { store } from "../../store";
-import { hasAccessToResource } from "./permissions";
-
-export const hasPermission = (
-  resource: string | undefined,
-  scopes: string[],
-  matchAll?: boolean,
-  containsResource?: boolean
-) => {
-  if (!resource) {
-    return false;
-  }
-  const state = store.getState();
-  const sessionGrants = state.console.session.permissions || {};
-  const resourceGrants =
-    sessionGrants[resource] ||
-    sessionGrants[`arn:aws:s3:::${resource}/*`] ||
-    [];
-  const globalGrants = sessionGrants["arn:aws:s3:::*"] || [];
-  let containsResourceGrants: string[] = [];
-  if (containsResource) {
-    const matchResource = `arn:aws:s3:::${resource}`;
-    for (const [key, value] of Object.entries(sessionGrants)) {
-      if (key.includes(matchResource)) {
-        containsResourceGrants = containsResourceGrants.concat(value);
-      }
-    }
-  }
-  return hasAccessToResource(
-    [...resourceGrants, ...globalGrants, ...containsResourceGrants],
-    scopes,
-    matchAll
-  );
-};
+import hasPermission from "./accessControl";
 
 interface ISecureComponentProps {
   errorProps?: any;
@@ -56,7 +23,7 @@ interface ISecureComponentProps {
   matchAll?: boolean;
   children: any;
   scopes: string[];
-  resource: string;
+  resource: string | string[];
   containsResource?: boolean;
 }
 

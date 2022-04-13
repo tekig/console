@@ -22,6 +22,12 @@ import {
   IStorageFactors,
 } from "./types";
 import { IPool } from "../screens/Console/Tenants/ListTenants/types";
+import {
+  IMkEnvs,
+  IntegrationConfiguration,
+  mkPanelConfigurations,
+} from "../screens/Console/Tenants/AddTenant/Steps/TenantResources/utils";
+import get from "lodash/get";
 
 const minStReq = 1073741824; // Minimal Space required for MinIO
 const minMemReq = 2147483648; // Minimal Memory required for MinIO in bytes
@@ -101,18 +107,34 @@ export const factorForDropdown = () => {
 };
 
 // units to be used in a dropdown
-export const k8sfactorForDropdown = () => {
-  return k8sUnits.map((unit) => {
-    return { label: unit, value: unit };
-  });
+export const k8sScalarUnitsExcluding = (exclude?: string[]) => {
+  return k8sUnits
+    .filter((unit) => {
+      if (exclude && exclude.includes(unit)) {
+        return false;
+      }
+      return true;
+    })
+    .map((unit) => {
+      return { label: unit, value: unit };
+    });
 };
 
-//getBytes, converts from a value and a unit from units array to bytes
+//getBytes, converts from a value and a unit from units array to bytes as a string
 export const getBytes = (
   value: string,
   unit: string,
   fromk8s: boolean = false
-) => {
+): string => {
+  return getBytesNumber(value, unit, fromk8s).toString(10);
+};
+
+//getBytesNumber, converts from a value and a unit from units array to bytes
+export const getBytesNumber = (
+  value: string,
+  unit: string,
+  fromk8s: boolean = false
+): number => {
   const vl: number = parseFloat(value);
 
   const unitsTake = fromk8s ? k8sCalcUnits : units;
@@ -120,12 +142,12 @@ export const getBytes = (
   const powFactor = unitsTake.findIndex((element) => element === unit);
 
   if (powFactor === -1) {
-    return "0";
+    return 0;
   }
   const factor = Math.pow(1024, powFactor);
   const total = vl * factor;
 
-  return total.toString(10);
+  return total;
 };
 
 //getTotalSize gets the total size of a value & unit
@@ -211,7 +233,9 @@ export const calculateDistribution = (
   capacityToUse: ICapacity,
   forcedNodes: number = 0,
   limitSize: number = 0,
-  drivesPerServer: number = 0
+  drivesPerServer: number = 0,
+  marketplaceIntegration?: IMkEnvs,
+  selectedStorageType?: string
 ): IStorageDistribution => {
   const requestedSizeBytes = getBytes(
     capacityToUse.value,
@@ -243,7 +267,9 @@ export const calculateDistribution = (
     requestedSizeBytes,
     forcedNodes,
     limitSize,
-    drivesPerServer
+    drivesPerServer,
+    marketplaceIntegration,
+    selectedStorageType
   );
 
   return numberOfNodes;
@@ -253,7 +279,9 @@ const calculateStorage = (
   requestedBytes: string,
   forcedNodes: number,
   limitSize: number,
-  drivesPerServer: number
+  drivesPerServer: number,
+  marketplaceIntegration?: IMkEnvs,
+  selectedStorageType?: string
 ): IStorageDistribution => {
   // Size validation
   const intReqBytes = parseInt(requestedBytes, 10);
@@ -265,7 +293,9 @@ const calculateStorage = (
     intReqBytes,
     maxDiskSize,
     limitSize,
-    drivesPerServer
+    drivesPerServer,
+    marketplaceIntegration,
+    selectedStorageType
   );
 };
 
@@ -274,7 +304,9 @@ const structureCalc = (
   desiredCapacity: number,
   maxDiskSize: number,
   maxClusterSize: number,
-  disksPerNode: number = 0
+  disksPerNode: number = 0,
+  marketplaceIntegration?: IMkEnvs,
+  selectedStorageType?: string
 ): IStorageDistribution => {
   if (
     isNaN(nodes) ||
@@ -342,6 +374,48 @@ const structureCalc = (
       disks: 0,
       pvSize: 0,
     }; // Cannot allocate this volume size
+  }
+  // validate for integrations
+  if (marketplaceIntegration !== undefined) {
+    const setConfigs = mkPanelConfigurations[marketplaceIntegration];
+    const keyCount = Object.keys(setConfigs).length;
+
+    //Configuration is filled
+    if (keyCount > 0) {
+      const configs: IntegrationConfiguration[] = get(
+        setConfigs,
+        "configurations",
+        []
+      );
+      const mainSelection = configs.find(
+        (item) => item.typeSelection === selectedStorageType
+      );
+
+      if (mainSelection !== undefined && mainSelection.minimumVolumeSize) {
+        const minimumPvSize = getBytesNumber(
+          mainSelection.minimumVolumeSize?.driveSize,
+          mainSelection.minimumVolumeSize?.sizeUnit,
+          true
+        );
+        const storageTypeLabel = setConfigs.variantSelectorValues!.find(
+          (item) => item.value === selectedStorageType
+        );
+
+        if (persistentVolumeSize < minimumPvSize) {
+          return {
+            error: `For the ${
+              storageTypeLabel!.label
+            } storage type the mininum volume size is ${
+              mainSelection.minimumVolumeSize.driveSize
+            }${mainSelection.minimumVolumeSize.sizeUnit}`,
+            nodes: 0,
+            persistentVolumes: 0,
+            disks: 0,
+            pvSize: 0,
+          };
+        }
+      }
+    }
   }
 
   return {
@@ -608,4 +682,21 @@ export const decodeFileName = (text: string) => {
   } catch (err) {
     return text;
   }
+};
+
+export const performDownload = (blob: Blob, fileName: string) => {
+  const link = document.createElement("a");
+  link.href = window.URL.createObjectURL(blob);
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+};
+
+export const getCookieValue = (cookieName: string) => {
+  return (
+    document.cookie
+      .match("(^|;)\\s*" + cookieName + "\\s*=\\s*([^;]+)")
+      ?.pop() || ""
+  );
 };

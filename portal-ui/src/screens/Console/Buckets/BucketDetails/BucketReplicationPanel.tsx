@@ -20,8 +20,6 @@ import { Theme } from "@mui/material/styles";
 import createStyles from "@mui/styles/createStyles";
 import withStyles from "@mui/styles/withStyles";
 import Grid from "@mui/material/Grid";
-import AddIcon from "../../../../icons/AddIcon";
-import BucketsIcon from "../../../../icons/BucketsIcon";
 import { setErrorSnackMessage } from "../../../../actions";
 import {
   actionsTray,
@@ -35,16 +33,16 @@ import {
 } from "../types";
 import { ErrorResponseHandler } from "../../../../common/types";
 import { AppState } from "../../../../store";
+import {
+  hasPermission,
+  SecureComponent,
+} from "../../../../common/SecureComponent";
+import { IAM_SCOPES } from "../../../../common/SecureComponent/permissions";
+import { AddIcon, BucketsIcon, TrashIcon } from "../../../../icons";
 import api from "../../../../common/api";
 import TableWrapper from "../../Common/TableWrapper/TableWrapper";
-
 import HelpBox from "../../../../common/HelpBox";
 import PanelTitle from "../../Common/PanelTitle/PanelTitle";
-import SecureComponent, {
-  hasPermission,
-} from "../../../../common/SecureComponent/SecureComponent";
-import { IAM_SCOPES } from "../../../../common/SecureComponent/permissions";
-
 import withSuspense from "../../Common/Components/withSuspense";
 import RBIconButton from "./SummaryItems/RBIconButton";
 import EditReplicationModal from "./EditReplicationModal";
@@ -78,7 +76,6 @@ const BucketReplicationPanel = ({
   match,
   setErrorSnackMessage,
   loadingBucket,
-  bucketInfo,
 }: IBucketReplicationProps) => {
   const [loadingReplication, setLoadingReplication] = useState<boolean>(true);
   const [replicationRules, setReplicationRules] = useState<
@@ -90,6 +87,9 @@ const BucketReplicationPanel = ({
   const [editReplicationModal, setEditReplicationModal] =
     useState<boolean>(false);
   const [selectedRRule, setSelectedRRule] = useState<string>("");
+  const [selectedRepRules, setSelectedRepRules] = useState<string[]>([]);
+  const [deleteSelectedRules, setDeleteSelectedRules] =
+    useState<boolean>(false);
 
   const bucketName = match.params["bucketName"];
 
@@ -158,6 +158,13 @@ const BucketReplicationPanel = ({
 
   const confirmDeleteReplication = (replication: BucketReplicationRule) => {
     setSelectedRRule(replication.id);
+    setDeleteSelectedRules(false);
+    setDeleteReplicationModal(true);
+  };
+
+  const confirmDeleteSelectedReplicationRules = () => {
+    setSelectedRRule("selectedRules");
+    setDeleteSelectedRules(true);
     setDeleteReplicationModal(true);
   };
 
@@ -174,11 +181,35 @@ const BucketReplicationPanel = ({
     return <Fragment>{events && events.tags !== "" ? "Yes" : "No"}</Fragment>;
   };
 
+  const selectAllItems = () => {
+    if (selectedRepRules.length === replicationRules.length) {
+      setSelectedRepRules([]);
+      return;
+    }
+    setSelectedRepRules(replicationRules.map((x) => x.id));
+  };
+
+  const selectRules = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const targetD = e.target;
+    const value = targetD.value;
+    const checked = targetD.checked;
+
+    let elements: string[] = [...selectedRepRules]; // We clone the selectedSAs array
+    if (checked) {
+      // If the user has checked this field we need to push this to selectedSAs
+      elements.push(value);
+    } else {
+      // User has unchecked this field, we need to remove it from the list
+      elements = elements.filter((element) => element !== value);
+    }
+    setSelectedRepRules(elements);
+    return elements;
+  };
+
   const replicationTableActions: any = [
     {
       type: "delete",
       onClick: confirmDeleteReplication,
-      disableButtonFunction: () => replicationRules.length === 1,
     },
     {
       type: "view",
@@ -208,6 +239,10 @@ const BucketReplicationPanel = ({
           selectedBucket={bucketName}
           closeDeleteModalAndRefresh={closeReplicationModalDelete}
           ruleToDelete={selectedRRule}
+          rulesToDelete={selectedRepRules}
+          remainingRules={replicationRules.length}
+          allSelected={selectedRepRules.length === replicationRules.length}
+          deleteSelectedRules={deleteSelectedRules}
         />
       )}
 
@@ -222,23 +257,43 @@ const BucketReplicationPanel = ({
       <Grid container>
         <Grid item xs={12} className={classes.actionsTray}>
           <PanelTitle>Replication</PanelTitle>
-          <SecureComponent
-            scopes={[IAM_SCOPES.S3_PUT_REPLICATION_CONFIGURATION]}
-            resource={bucketName}
-            matchAll
-            errorProps={{ disabled: true }}
-          >
-            <RBIconButton
-              tooltip={"Add Replication Rule"}
-              onClick={() => {
-                setOpenReplicationOpen(true);
-              }}
-              text={"Add Replication Rule"}
-              icon={<AddIcon />}
-              color="primary"
-              variant={"contained"}
-            />
-          </SecureComponent>
+          <div>
+            <SecureComponent
+              scopes={[IAM_SCOPES.S3_PUT_REPLICATION_CONFIGURATION]}
+              resource={bucketName}
+              matchAll
+              errorProps={{ disabled: true }}
+            >
+              <RBIconButton
+                tooltip={"Remove Selected Replication Rules"}
+                onClick={() => {
+                  confirmDeleteSelectedReplicationRules();
+                }}
+                text={"Remove Selected Rules"}
+                icon={<TrashIcon />}
+                color={"secondary"}
+                variant={"outlined"}
+                disabled={selectedRepRules.length === 0}
+              />
+            </SecureComponent>
+            <SecureComponent
+              scopes={[IAM_SCOPES.S3_PUT_REPLICATION_CONFIGURATION]}
+              resource={bucketName}
+              matchAll
+              errorProps={{ disabled: true }}
+            >
+              <RBIconButton
+                tooltip={"Add Replication Rule"}
+                onClick={() => {
+                  setOpenReplicationOpen(true);
+                }}
+                text={"Add Replication Rule"}
+                icon={<AddIcon />}
+                color="primary"
+                variant={"contained"}
+              />
+            </SecureComponent>
+          </div>
         </Grid>
         <Grid item xs={12}>
           <SecureComponent
@@ -279,10 +334,14 @@ const BucketReplicationPanel = ({
               idField="id"
               customPaperHeight={classes.twHeight}
               textSelectable
+              selectedItems={selectedRepRules}
+              onSelect={(e) => selectRules(e)}
+              onSelectAll={selectAllItems}
             />
           </SecureComponent>
         </Grid>
         <Grid item xs={12}>
+          <br />
           <HelpBox
             title={"Replication"}
             iconComponent={<BucketsIcon />}

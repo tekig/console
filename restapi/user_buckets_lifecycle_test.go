@@ -52,7 +52,8 @@ func TestGetLifecycleRules(t *testing.T) {
 
 	function := "getBucketLifecycle()"
 	bucketName := "testBucket"
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	// Test-1 : getBucketLifecycle() get list of events for a particular bucket only one config
 	// mock lifecycle response from MinIO
@@ -144,7 +145,8 @@ func TestSetLifecycleRule(t *testing.T) {
 	minClient := minioClientMock{}
 
 	function := "addBucketLifecycle()"
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	// Test-1 : addBucketLifecycle() get list of events for a particular bucket only one config
 	// mock create request
@@ -163,9 +165,12 @@ func TestSetLifecycleRule(t *testing.T) {
 		return &mockLifecycle, nil
 	}
 
+	expiryRule := "expiry"
+
 	insertMock := user_api.AddBucketLifecycleParams{
 		BucketName: "testBucket",
 		Body: &models.AddBucketLifecycle{
+			Type:                                    expiryRule,
 			Disable:                                 false,
 			ExpiredObjectDeleteMarker:               false,
 			ExpiryDays:                              int32(16),
@@ -175,7 +180,6 @@ func TestSetLifecycleRule(t *testing.T) {
 			Prefix:                                  "pref1",
 			StorageClass:                            "",
 			Tags:                                    "",
-			TransitionDate:                          "",
 			TransitionDays:                          0,
 		},
 	}
@@ -197,4 +201,170 @@ func TestSetLifecycleRule(t *testing.T) {
 	err2 := addBucketLifecycle(ctx, minClient, insertMock)
 
 	assert.Equal(errors.New("error setting lifecycle"), err2, fmt.Sprintf("Failed on %s: Error returned", function))
+}
+
+func TestUpdateLifecycleRule(t *testing.T) {
+	assert := assert.New(t)
+	// mock minIO client
+	minClient := minioClientMock{}
+
+	function := "editBucketLifecycle()"
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Test-1 : editBucketLifecycle() get list of events for a particular bucket only one config (get lifecycle mock)
+	// mock create request
+	mockLifecycle := lifecycle.Configuration{
+		Rules: []lifecycle.Rule{
+			{
+				ID:         "TESTRULE",
+				Expiration: lifecycle.Expiration{Days: 15},
+				Status:     "Enabled",
+				RuleFilter: lifecycle.Filter{Tag: lifecycle.Tag{Key: "tag1", Value: "val1"}, And: lifecycle.And{Prefix: "prefix1"}},
+			},
+		},
+	}
+
+	minioGetLifecycleRulesMock = func(ctx context.Context, bucketName string) (lifecycle *lifecycle.Configuration, err error) {
+		return &mockLifecycle, nil
+	}
+
+	// Test-2 : editBucketLifecycle() Update lifecycle rule
+
+	expiryRule := "expiry"
+
+	editMock := user_api.UpdateBucketLifecycleParams{
+		BucketName: "testBucket",
+		Body: &models.UpdateBucketLifecycle{
+			Type:                                    &expiryRule,
+			Disable:                                 false,
+			ExpiredObjectDeleteMarker:               false,
+			ExpiryDays:                              int32(16),
+			NoncurrentversionExpirationDays:         0,
+			NoncurrentversionTransitionDays:         0,
+			NoncurrentversionTransitionStorageClass: "",
+			Prefix:                                  "pref1",
+			StorageClass:                            "",
+			Tags:                                    "",
+			TransitionDays:                          0,
+		},
+	}
+
+	minioSetBucketLifecycleMock = func(ctx context.Context, bucketName string, config *lifecycle.Configuration) error {
+		return nil
+	}
+
+	err := editBucketLifecycle(ctx, minClient, editMock)
+
+	assert.Equal(nil, err, fmt.Sprintf("Failed on %s: Error returned", function))
+
+	// Test-2a : editBucketLifecycle() Update lifecycle rule
+
+	transitionRule := "transition"
+
+	editMock = user_api.UpdateBucketLifecycleParams{
+		BucketName: "testBucket",
+		Body: &models.UpdateBucketLifecycle{
+			Type:                                    &transitionRule,
+			Disable:                                 false,
+			ExpiredObjectDeleteMarker:               false,
+			NoncurrentversionTransitionDays:         5,
+			Prefix:                                  "pref1",
+			StorageClass:                            "TEST",
+			NoncurrentversionTransitionStorageClass: "TESTNC",
+			Tags:                                    "",
+			TransitionDays:                          int32(16),
+		},
+	}
+
+	minioSetBucketLifecycleMock = func(ctx context.Context, bucketName string, config *lifecycle.Configuration) error {
+		return nil
+	}
+
+	err = editBucketLifecycle(ctx, minClient, editMock)
+
+	assert.Equal(nil, err, fmt.Sprintf("Failed on %s: Error returned", function))
+
+	// Test-3 : editBucketLifecycle() returns error
+
+	minioSetBucketLifecycleMock = func(ctx context.Context, bucketName string, config *lifecycle.Configuration) error {
+		return errors.New("error setting lifecycle")
+	}
+
+	err2 := editBucketLifecycle(ctx, minClient, editMock)
+
+	assert.Equal(errors.New("error setting lifecycle"), err2, fmt.Sprintf("Failed on %s: Error returned", function))
+}
+
+func TestDeleteLifecycleRule(t *testing.T) {
+	assert := assert.New(t)
+	// mock minIO client
+	minClient := minioClientMock{}
+
+	function := "deleteBucketLifecycle()"
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	minioSetBucketLifecycleMock = func(ctx context.Context, bucketName string, config *lifecycle.Configuration) error {
+		return nil
+	}
+
+	// Test-1 : deleteBucketLifecycle() get list of events for a particular bucket only one config (get lifecycle mock)
+	// mock create request
+	mockLifecycle := lifecycle.Configuration{
+		Rules: []lifecycle.Rule{
+			{
+				ID:         "TESTRULE",
+				Expiration: lifecycle.Expiration{Days: 15},
+				Status:     "Enabled",
+				RuleFilter: lifecycle.Filter{Tag: lifecycle.Tag{Key: "tag1", Value: "val1"}, And: lifecycle.And{Prefix: "prefix1"}},
+			},
+			{
+				ID:         "TESTRULE2",
+				Transition: lifecycle.Transition{Days: 10, StorageClass: "TESTSTCLASS"},
+				Status:     "Enabled",
+				RuleFilter: lifecycle.Filter{Tag: lifecycle.Tag{Key: "tag1", Value: "val1"}, And: lifecycle.And{Prefix: "prefix1"}},
+			},
+		},
+	}
+
+	minioGetLifecycleRulesMock = func(ctx context.Context, bucketName string) (lifecycle *lifecycle.Configuration, err error) {
+		return &mockLifecycle, nil
+	}
+
+	// Test-2 : deleteBucketLifecycle() try to delete an available rule
+
+	availableParams := user_api.DeleteBucketLifecycleRuleParams{
+		LifecycleID: "TESTRULE2",
+		BucketName:  "testBucket",
+	}
+
+	err := deleteBucketLifecycle(ctx, minClient, availableParams)
+
+	assert.Equal(nil, err, fmt.Sprintf("Failed on %s: Error returned", function))
+
+	// Test-3 : deleteBucketLifecycle() returns error trying to delete a non available rule
+
+	nonAvailableParams := user_api.DeleteBucketLifecycleRuleParams{
+		LifecycleID: "INVALIDTESTRULE",
+		BucketName:  "testBucket",
+	}
+
+	err2 := deleteBucketLifecycle(ctx, minClient, nonAvailableParams)
+
+	assert.Equal(fmt.Errorf("lifecycle rule for id '%s' doesn't exist", nonAvailableParams.LifecycleID), err2, fmt.Sprintf("Failed on %s: Error returned", function))
+
+	// Test-4 : deleteBucketLifecycle() returns error trying to delete a rule when no rules are available
+
+	mockLifecycle2 := lifecycle.Configuration{
+		Rules: []lifecycle.Rule{},
+	}
+
+	minioGetLifecycleRulesMock = func(ctx context.Context, bucketName string) (lifecycle *lifecycle.Configuration, err error) {
+		return &mockLifecycle2, nil
+	}
+
+	err3 := deleteBucketLifecycle(ctx, minClient, nonAvailableParams)
+
+	assert.Equal(errors.New("no rules available to delete"), err3, fmt.Sprintf("Failed on %s: Error returned", function))
 }

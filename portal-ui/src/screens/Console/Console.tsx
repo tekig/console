@@ -47,16 +47,16 @@ import {
   IAM_SCOPES,
   S3_ALL_RESOURCES,
 } from "../../common/SecureComponent/permissions";
-import { hasPermission } from "../../common/SecureComponent/SecureComponent";
+import { hasPermission } from "../../common/SecureComponent";
 import { IRouteRule } from "./Menu/types";
 import LoadingComponent from "../../common/LoadingComponent";
+import EditPool from "./Tenants/TenantDetails/Pools/EditPool/EditPool";
+import ComponentsScreen from "./Common/ComponentsScreen";
 
 const Trace = React.lazy(() => import("./Trace/Trace"));
 const Heal = React.lazy(() => import("./Heal/Heal"));
 const Watch = React.lazy(() => import("./Watch/Watch"));
 const HealthInfo = React.lazy(() => import("./HealthInfo/HealthInfo"));
-const Storage = React.lazy(() => import("./Storage/Storage"));
-const Metrics = React.lazy(() => import("./Dashboard/Metrics"));
 const Hop = React.lazy(() => import("./Tenants/TenantDetails/hop/Hop"));
 
 const AddTenant = React.lazy(() => import("./Tenants/AddTenant/AddTenant"));
@@ -115,7 +115,12 @@ const License = React.lazy(() => import("./License/License"));
 const ConfigurationOptions = React.lazy(
   () => import("./Configurations/ConfigurationPanels/ConfigurationOptions")
 );
-
+const AddPool = React.lazy(
+  () => import("./Tenants/TenantDetails/Pools/AddPool/AddPool")
+);
+const SiteReplication = React.lazy(
+  () => import("./Configurations/SiteReplication/SiteReplication")
+);
 const styles = (theme: Theme) =>
   createStyles({
     root: {
@@ -150,7 +155,6 @@ interface IConsoleProps {
   open: boolean;
   needsRestart: boolean;
   isServerLoading: boolean;
-  title: string;
   classes: any;
   setMenuOpen: typeof setMenuOpen;
   serverNeedsRestart: typeof serverNeedsRestart;
@@ -213,12 +217,11 @@ const Console = ({
       path: IAM_PAGES.DASHBOARD,
     },
     {
-      component: Metrics,
-      path: IAM_PAGES.METRICS,
-    },
-    {
       component: Buckets,
       path: IAM_PAGES.ADD_BUCKETS,
+      customPermissionFnc: () => {
+        return hasPermission("*", IAM_PAGES_PERMISSIONS[IAM_PAGES.ADD_BUCKETS]);
+      },
     },
     {
       component: Buckets,
@@ -330,6 +333,10 @@ const Console = ({
       path: IAM_PAGES.PROFILE,
     },
     {
+      component: Tools,
+      path: IAM_PAGES.SUPPORT_INSPECT,
+    },
+    {
       component: ConfigurationOptions,
       path: IAM_PAGES.SETTINGS,
     },
@@ -364,6 +371,10 @@ const Console = ({
       path: IAM_PAGES.TIERS,
     },
     {
+      component: SiteReplication,
+      path: IAM_PAGES.SITE_REPLICATION,
+    },
+    {
       component: Account,
       path: IAM_PAGES.ACCOUNT,
       forceDisplay: true, // user has implicit access to service-accounts
@@ -384,21 +395,6 @@ const Console = ({
     {
       component: AddTenant,
       path: IAM_PAGES.TENANTS_ADD,
-      forceDisplay: true,
-    },
-    {
-      component: Storage,
-      path: IAM_PAGES.STORAGE,
-      forceDisplay: true,
-    },
-    {
-      component: Storage,
-      path: IAM_PAGES.STORAGE_VOLUMES,
-      forceDisplay: true,
-    },
-    {
-      component: Storage,
-      path: IAM_PAGES.STORAGE_DRIVES,
       forceDisplay: true,
     },
     {
@@ -433,12 +429,27 @@ const Console = ({
     },
     {
       component: TenantDetails,
+      path: IAM_PAGES.NAMESPACE_TENANT_TRACE,
+      forceDisplay: true,
+    },
+    {
+      component: TenantDetails,
       path: IAM_PAGES.NAMESPACE_TENANT_PODS_LIST,
       forceDisplay: true,
     },
     {
       component: TenantDetails,
       path: IAM_PAGES.NAMESPACE_TENANT_POOLS,
+      forceDisplay: true,
+    },
+    {
+      component: AddPool,
+      path: IAM_PAGES.NAMESPACE_TENANT_POOLS_ADD,
+      forceDisplay: true,
+    },
+    {
+      component: EditPool,
+      path: IAM_PAGES.NAMESPACE_TENANT_POOLS_EDIT,
       forceDisplay: true,
     },
     {
@@ -453,7 +464,17 @@ const Console = ({
     },
     {
       component: TenantDetails,
+      path: IAM_PAGES.NAMESPACE_TENANT_IDENTITY_PROVIDER,
+      forceDisplay: true,
+    },
+    {
+      component: TenantDetails,
       path: IAM_PAGES.NAMESPACE_TENANT_SECURITY,
+      forceDisplay: true,
+    },
+    {
+      component: TenantDetails,
+      path: IAM_PAGES.NAMESPACE_TENANT_ENCRYPTION,
       forceDisplay: true,
     },
     {
@@ -464,6 +485,11 @@ const Console = ({
     {
       component: TenantDetails,
       path: IAM_PAGES.NAMESPACE_TENANT_LOGGING,
+      forceDisplay: true,
+    },
+    {
+      component: TenantDetails,
+      path: IAM_PAGES.NAMESPACE_TENANT_EVENTS,
       forceDisplay: true,
     },
     {
@@ -506,7 +532,7 @@ const Console = ({
   const location = useLocation();
 
   let hideMenu = false;
-  if (location.pathname === IAM_PAGES.METRICS) {
+  if (features?.includes("hide-menu")) {
     hideMenu = true;
   } else if (location.pathname.endsWith("/hop")) {
     hideMenu = true;
@@ -592,6 +618,11 @@ const Console = ({
                 <Route key={"/icons"} exact path={"/icons"}>
                   <Suspense fallback={<LoadingComponent />}>
                     <IconsScreen />
+                  </Suspense>
+                </Route>
+                <Route key={"/components"} exact path={"/components"}>
+                  <Suspense fallback={<LoadingComponent />}>
+                    <ComponentsScreen />
                   </Suspense>
                 </Route>
                 {allowedRoutes.length > 0 ? (

@@ -50,6 +50,10 @@ func getMinIOServer() string {
 	return strings.TrimSpace(env.Get(ConsoleMinIOServer, "http://localhost:9000"))
 }
 
+func getSubnetProxy() string {
+	return strings.TrimSpace(env.Get(ConsoleSubnetProxy, ""))
+}
+
 func GetMinIORegion() string {
 	return strings.TrimSpace(env.Get(ConsoleMinIORegion, ""))
 }
@@ -225,12 +229,6 @@ func getPrometheusURL() string {
 
 func getPrometheusJobID() string {
 	return env.Get(PrometheusJobID, "minio-job")
-}
-
-// GetSubnetLicense returns the current subnet jwt license
-func GetSubnetLicense() string {
-	// fallback to console license env variable
-	return env.Get(ConsoleSubnetLicense, "")
 }
 
 var (

@@ -41,6 +41,8 @@ import (
 
 func serveProxy(responseWriter http.ResponseWriter, req *http.Request) {
 	urlParts := strings.Split(req.URL.Path, "/")
+	// Either proxy or hop, will decide the type of session
+	proxyMethod := urlParts[2]
 
 	if len(urlParts) < 5 {
 		log.Println(len(urlParts))
@@ -99,7 +101,7 @@ func serveProxy(responseWriter http.ResponseWriter, req *http.Request) {
 
 	h := sha1.New()
 	h.Write([]byte(nsTenant))
-	tenantCookieName := fmt.Sprintf("token-%x", string(h.Sum(nil)))
+	tenantCookieName := fmt.Sprintf("token-%s-%s-%x", proxyMethod, claims.AccountAccessKey, string(h.Sum(nil)))
 	tenantCookie, err := req.Cookie(tenantCookieName)
 	if err != nil {
 		// login to tenantName
@@ -123,9 +125,15 @@ func serveProxy(responseWriter http.ResponseWriter, req *http.Request) {
 			return
 		}
 
-		data := map[string]string{
-			"accessKey": string(tenantConfiguration["accesskey"]),
-			"secretKey": string(tenantConfiguration["secretkey"]),
+		data := map[string]interface{}{
+			"accessKey": tenantConfiguration["accesskey"],
+			"secretKey": tenantConfiguration["secretkey"],
+		}
+		// if this a proxy request hide the menu
+		if proxyMethod == "proxy" {
+			data["features"] = map[string]bool{
+				"hide_menu": true,
+			}
 		}
 		payload, _ := json.Marshal(data)
 
@@ -185,7 +193,7 @@ func serveProxy(responseWriter http.ResponseWriter, req *http.Request) {
 		responseWriter.WriteHeader(500)
 		return
 	}
-	tenantBase := fmt.Sprintf("/api/proxy/%s/%s", tenant.Namespace, tenant.Name)
+	tenantBase := fmt.Sprintf("/api/%s/%s/%s", proxyMethod, tenant.Namespace, tenant.Name)
 	targetURL.Path = strings.Replace(req.URL.Path, tenantBase, "", -1)
 
 	proxiedCookie := &http.Cookie{
@@ -246,7 +254,9 @@ func serveProxy(responseWriter http.ResponseWriter, req *http.Request) {
 	}
 	// Allow iframes
 	responseWriter.Header().Set("X-Frame-Options", "SAMEORIGIN")
-	responseWriter.Header().Set("X-XSS-Protection", "1")
+	responseWriter.Header().Set("X-XSS-Protection", "1; mode=block")
+	// Pass HTTP status code to proxy response
+	responseWriter.WriteHeader(resp.StatusCode)
 
 	io.Copy(responseWriter, resp.Body)
 

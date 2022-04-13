@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { ITenant } from "./ListTenants/types";
+import { IPool, ITenant } from "./ListTenants/types";
 import { Opts } from "./ListTenants/utils";
 import {
   ADD_TENANT_ADD_CA_KEYPAIR,
@@ -33,25 +33,47 @@ import {
   ADD_TENANT_ENCRYPTION_VAULT_CA,
   ADD_TENANT_ENCRYPTION_VAULT_CERT,
   ADD_TENANT_RESET_FORM,
-  ADD_TENANT_SET_CURRENT_PAGE,
   ADD_TENANT_SET_LIMIT_SIZE,
   ADD_TENANT_SET_PAGE_VALID,
   ADD_TENANT_SET_STORAGE_CLASSES_LIST,
+  ADD_TENANT_SET_STORAGE_TYPE,
   ADD_TENANT_UPDATE_FIELD,
+  ADD_TENANT_SET_KEY_PAIR_VALUE,
+  ADD_TENANT_SET_TOLERATION_VALUE,
+  ADD_TENANT_ADD_NEW_TOLERATION,
+  ADD_TENANT_REMOVE_TOLERATION_ROW,
   TENANT_DETAILS_SET_CURRENT_TENANT,
   TENANT_DETAILS_SET_LOADING,
   TENANT_DETAILS_SET_TAB,
   TENANT_DETAILS_SET_TENANT,
+  LabelKeyPair,
+  ADD_POOL_SET_LOADING,
+  ADD_POOL_RESET_FORM,
+  ADD_POOL_SET_VALUE,
+  IAddPoolFields,
+  ADD_POOL_SET_PAGE_VALID,
+  ADD_POOL_SET_POOL_STORAGE_CLASSES,
+  ADD_POOL_SET_TOLERATION_VALUE,
+  ADD_POOL_ADD_NEW_TOLERATION,
+  ADD_POOL_REMOVE_TOLERATION_ROW,
+  ADD_POOL_SET_KEY_PAIR_VALUE,
+  POOL_DETAILS_SET_SELECTED_POOL,
+  POOL_DETAILS_SET_OPEN_DETAILS,
+  EDIT_POOL_SET_INITIAL_INFO,
+  EDIT_POOL_SET_LOADING,
+  EDIT_POOL_RESET_FORM,
+  IEditPoolFields,
+  EDIT_POOL_SET_VALUE,
+  EDIT_POOL_SET_PAGE_VALID,
+  EDIT_POOL_SET_POOL_STORAGE_CLASSES,
+  EDIT_POOL_SET_TOLERATION_VALUE,
+  EDIT_POOL_ADD_NEW_TOLERATION,
+  EDIT_POOL_REMOVE_TOLERATION_ROW,
+  EDIT_POOL_SET_KEY_PAIR_VALUE,
 } from "./types";
+import { ITolerationModel } from "../../../common/types";
 
 // Basic actions
-export const setWizardPage = (page: number) => {
-  return {
-    type: ADD_TENANT_SET_CURRENT_PAGE,
-    page,
-  };
-};
-
 export const updateAddField = (
   pageName: string,
   fieldName: string,
@@ -79,6 +101,14 @@ export const setStorageClassesList = (storageClasses: Opts[]) => {
   return {
     type: ADD_TENANT_SET_STORAGE_CLASSES_LIST,
     storageClasses,
+  };
+};
+
+export const setStorageType = (storageType: string, features?: string[]) => {
+  return {
+    type: ADD_TENANT_SET_STORAGE_TYPE,
+    storageType,
+    features,
   };
 };
 
@@ -275,5 +305,207 @@ export const setTenantTab = (tab: string) => {
   return {
     type: TENANT_DETAILS_SET_TAB,
     tab,
+  };
+};
+
+export const setKeyValuePairs = (newArray: LabelKeyPair[]) => {
+  return {
+    type: ADD_TENANT_SET_KEY_PAIR_VALUE,
+    newArray,
+  };
+};
+
+export const setTolerationInfo = (
+  index: number,
+  tolerationValue: ITolerationModel
+) => {
+  return {
+    type: ADD_TENANT_SET_TOLERATION_VALUE,
+    index,
+    toleration: tolerationValue,
+  };
+};
+
+export const addNewToleration = () => {
+  return {
+    type: ADD_TENANT_ADD_NEW_TOLERATION,
+  };
+};
+
+export const removeToleration = (index: number) => {
+  return {
+    type: ADD_TENANT_REMOVE_TOLERATION_ROW,
+    index,
+  };
+};
+
+// Add Pool
+
+export const setPoolLoading = (state: boolean) => {
+  return {
+    type: ADD_POOL_SET_LOADING,
+    state,
+  };
+};
+
+export const resetPoolForm = () => {
+  return {
+    type: ADD_POOL_RESET_FORM,
+  };
+};
+
+export const setPoolField = (
+  page: keyof IAddPoolFields,
+  field: string,
+  value: any
+) => {
+  return {
+    type: ADD_POOL_SET_VALUE,
+    page,
+    field,
+    value,
+  };
+};
+
+export const isPoolPageValid = (page: string, status: boolean) => {
+  return {
+    type: ADD_POOL_SET_PAGE_VALID,
+    page,
+    status,
+  };
+};
+
+export const setPoolStorageClasses = (storageClasses: Opts[]) => {
+  return {
+    type: ADD_POOL_SET_POOL_STORAGE_CLASSES,
+    storageClasses,
+  };
+};
+
+export const setPoolTolerationInfo = (
+  index: number,
+  tolerationValue: ITolerationModel
+) => {
+  return {
+    type: ADD_POOL_SET_TOLERATION_VALUE,
+    index,
+    toleration: tolerationValue,
+  };
+};
+
+export const addNewPoolToleration = () => {
+  return {
+    type: ADD_POOL_ADD_NEW_TOLERATION,
+  };
+};
+
+export const removePoolToleration = (index: number) => {
+  return {
+    type: ADD_POOL_REMOVE_TOLERATION_ROW,
+    index,
+  };
+};
+
+export const setPoolKeyValuePairs = (newArray: LabelKeyPair[]) => {
+  return {
+    type: ADD_POOL_SET_KEY_PAIR_VALUE,
+    newArray,
+  };
+};
+
+//Pool Details
+
+export const setSelectedPool = (newPool: string | null) => {
+  return {
+    type: POOL_DETAILS_SET_SELECTED_POOL,
+    pool: newPool,
+  };
+};
+
+export const setOpenPoolDetails = (state: boolean) => {
+  return {
+    type: POOL_DETAILS_SET_OPEN_DETAILS,
+    state,
+  };
+};
+
+// Edit Pool
+
+export const setInitialPoolDetails = (pool: IPool) => {
+  return {
+    type: EDIT_POOL_SET_INITIAL_INFO,
+    pool,
+  };
+};
+
+export const setEditPoolLoading = (state: boolean) => {
+  return {
+    type: EDIT_POOL_SET_LOADING,
+    state,
+  };
+};
+
+export const resetEditPoolForm = () => {
+  return {
+    type: EDIT_POOL_RESET_FORM,
+  };
+};
+
+export const setEditPoolField = (
+  page: keyof IEditPoolFields,
+  field: string,
+  value: any
+) => {
+  return {
+    type: EDIT_POOL_SET_VALUE,
+    page,
+    field,
+    value,
+  };
+};
+
+export const isEditPoolPageValid = (page: string, status: boolean) => {
+  return {
+    type: EDIT_POOL_SET_PAGE_VALID,
+    page,
+    status,
+  };
+};
+
+export const setEditPoolStorageClasses = (storageClasses: Opts[]) => {
+  return {
+    type: EDIT_POOL_SET_POOL_STORAGE_CLASSES,
+    storageClasses,
+  };
+};
+
+export const setEditPoolTolerationInfo = (
+  index: number,
+  tolerationValue: ITolerationModel
+) => {
+  return {
+    type: EDIT_POOL_SET_TOLERATION_VALUE,
+    index,
+    toleration: tolerationValue,
+  };
+};
+
+export const addNewEditPoolToleration = () => {
+  return {
+    type: EDIT_POOL_ADD_NEW_TOLERATION,
+  };
+};
+
+export const removeEditPoolToleration = (index: number) => {
+  return {
+    type: EDIT_POOL_REMOVE_TOLERATION_ROW,
+    index,
+  };
+};
+
+export const setEditPoolKeyValuePairs = (newArray: LabelKeyPair[]) => {
+  return {
+    type: EDIT_POOL_SET_KEY_PAIR_VALUE,
+    newArray,
   };
 };

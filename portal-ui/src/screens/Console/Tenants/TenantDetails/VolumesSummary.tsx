@@ -22,10 +22,9 @@ import createStyles from "@mui/styles/createStyles";
 import withStyles from "@mui/styles/withStyles";
 import { Grid, InputAdornment, TextField } from "@mui/material";
 import {
-  actionsTray,
   containerForHeader,
-  searchField,
   tableStyles,
+  tenantDetailsStyles,
 } from "../../Common/FormComponents/common/styleLibrary";
 import { IStoragePVCs } from "../../Storage/types";
 import { setErrorSnackMessage } from "../../../../actions";
@@ -51,11 +50,7 @@ interface ITenantVolumesProps {
 
 const styles = (theme: Theme) =>
   createStyles({
-    tableWrapper: {
-      height: "450px",
-    },
-    ...actionsTray,
-    ...searchField,
+    ...tenantDetailsStyles,
     ...tableStyles,
     ...containerForHeader(theme.spacing(4)),
   });
@@ -106,7 +101,7 @@ const TenantVolumes = ({
   };
 
   const filteredRecords: IStoragePVCs[] = records.filter((elementItem) =>
-    elementItem.name.includes(filter)
+    elementItem.name.toLowerCase().includes(filter.toLowerCase())
   );
 
   const PVCViewAction = (PVC: IPodListElement) => {
@@ -136,62 +131,61 @@ const TenantVolumes = ({
           closeDeleteModalAndRefresh={closeDeleteModalAndRefresh}
         />
       )}
-      <h1 className={classes.sectionTitle}>Volumes</h1>
-      <Grid item xs={12} className={classes.actionsTray}>
-        <TextField
-          placeholder="Search Volumes (PVCs)"
-          className={classes.searchField}
-          id="search-resource"
-          label=""
-          InputProps={{
-            disableUnderline: true,
-            startAdornment: (
-              <InputAdornment position="start">
-                <SearchIcon />
-              </InputAdornment>
-            ),
-          }}
-          onChange={(e) => {
-            setFilter(e.target.value);
-          }}
-          variant="standard"
-        />
-      </Grid>
-      <Grid item xs={12}>
-        <br />
-      </Grid>
-      <Grid item xs={12} className={classes.tableBlock}>
-        <TableWrapper
-          itemActions={[
-            { type: "view", onClick: PVCViewAction },
-            { type: "delete", onClick: confirmDeletePVC },
-          ]}
-          columns={[
-            {
-              label: "Name",
-              elementKey: "name",
-            },
-            {
-              label: "Status",
-              elementKey: "status",
-              width: 120,
-            },
-            {
-              label: "Capacity",
-              elementKey: "capacity",
-              width: 120,
-            },
-            {
-              label: "Storage Class",
-              elementKey: "storageClass",
-            },
-          ]}
-          isLoading={loading}
-          records={filteredRecords}
-          entityName="PVCs"
-          idField="name"
-          customPaperHeight={classes.tableWrapper}
-        />
+      <Grid container spacing={1}>
+        <h1 className={classes.sectionTitle}>Volumes</h1>
+        <Grid item xs={12}>
+          <TextField
+            placeholder="Search Volumes (PVCs)"
+            className={classes.searchField}
+            id="search-resource"
+            label=""
+            InputProps={{
+              disableUnderline: true,
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon />
+                </InputAdornment>
+              ),
+            }}
+            onChange={(e) => {
+              setFilter(e.target.value);
+            }}
+            variant="standard"
+          />
+        </Grid>
+        <Grid item xs={12} className={classes.tableBlock}>
+          <TableWrapper
+            itemActions={[
+              { type: "view", onClick: PVCViewAction },
+              { type: "delete", onClick: confirmDeletePVC },
+            ]}
+            columns={[
+              {
+                label: "Name",
+                elementKey: "name",
+              },
+              {
+                label: "Status",
+                elementKey: "status",
+                width: 120,
+              },
+              {
+                label: "Capacity",
+                elementKey: "capacity",
+                width: 120,
+              },
+              {
+                label: "Storage Class",
+                elementKey: "storageClass",
+              },
+            ]}
+            isLoading={loading}
+            records={filteredRecords}
+            entityName="PVCs"
+            idField="name"
+            customPaperHeight={classes.tableWrapper}
+          />
+        </Grid>
       </Grid>
     </Fragment>
   );

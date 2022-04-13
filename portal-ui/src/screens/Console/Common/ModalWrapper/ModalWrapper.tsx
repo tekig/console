@@ -28,8 +28,8 @@ import {
 import { AppState } from "../../../../store";
 import { snackBarMessage } from "../../../../types";
 import { setModalSnackMessage } from "../../../../actions";
-import ModalError from "../FormComponents/ModalError/ModalError";
 import CloseIcon from "@mui/icons-material/Close";
+import MainError from "../MainError/MainError";
 
 interface IModalProps {
   classes: any;
@@ -47,11 +47,6 @@ interface IModalProps {
 const styles = (theme: Theme) =>
   createStyles({
     ...deleteDialogStyles,
-    root: {
-      "& .MuiPaper-root": {
-        padding: "1rem 2rem 2rem 1rem",
-      },
-    },
     content: {
       padding: 25,
       paddingBottom: 0,
@@ -139,6 +134,7 @@ const ModalWrapper = ({
         <div className={classes.closeContainer}>
           <IconButton
             aria-label="close"
+            id={"close"}
             className={classes.closeButton}
             onClick={onClose}
             disableRipple
@@ -149,7 +145,7 @@ const ModalWrapper = ({
         </div>
       </DialogTitle>
 
-      <ModalError />
+      <MainError isModal={true} />
       <Snackbar
         open={openSnackbar}
         className={classes.snackBarModal}

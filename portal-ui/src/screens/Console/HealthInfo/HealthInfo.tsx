@@ -27,6 +27,7 @@ import {
   DiagStatInProgress,
   DiagStatSuccess,
   HealthInfoMessage,
+  ReportMessage,
 } from "./types";
 import { Theme } from "@mui/material/styles";
 import createStyles from "@mui/styles/createStyles";
@@ -44,11 +45,11 @@ import {
 import { Button, Grid } from "@mui/material";
 import PageHeader from "../Common/PageHeader/PageHeader";
 import { setServerDiagStat, setSnackBarMessage } from "../../../actions";
-import CircularProgress from "@mui/material/CircularProgress";
 import TestWrapper from "../Common/TestWrapper/TestWrapper";
 import PageLayout from "../Common/Layout/PageLayout";
 import HelpBox from "../../../common/HelpBox";
 import WarnIcon from "../../../icons/WarnIcon";
+import Loader from "../Common/Loader/Loader";
 
 const styles = (theme: Theme) =>
   createStyles({
@@ -84,22 +85,6 @@ const styles = (theme: Theme) =>
     ...containerForHeader(theme.spacing(4)),
   });
 
-const download = (filename: string, text: string) => {
-  let element = document.createElement("a");
-  element.setAttribute(
-    "href",
-    "data:text/plain;charset=utf-8," + encodeURIComponent(text)
-  );
-  element.setAttribute("download", filename);
-
-  element.style.display = "none";
-  document.body.appendChild(element);
-
-  element.click();
-
-  document.body.removeChild(element);
-};
-
 interface IHealthInfo {
   classes: any;
   healthInfoMessageReceived: typeof healthInfoMessageReceived;
@@ -126,6 +111,23 @@ const HealthInfo = ({
   const [downloadDisabled, setDownloadDisabled] = useState(true);
   const [localMessage, setMessage] = useState<string>("");
   const [title, setTitle] = useState<string>("New Diagnostic");
+  const [diagFileContent, setDiagFileContent] = useState<string>("");
+
+  const download = () => {
+    let element = document.createElement("a");
+    element.setAttribute(
+      "href",
+      `data:application/gzip;base64,${diagFileContent}`
+    );
+    element.setAttribute("download", "diagnostic.json.gz");
+
+    element.style.display = "none";
+    document.body.appendChild(element);
+
+    element.click();
+
+    document.body.removeChild(element);
+  };
 
   useEffect(() => {
     if (serverDiagnosticStatus === DiagStatInProgress) {
@@ -164,6 +166,7 @@ const HealthInfo = ({
   useEffect(() => {
     if (startDiagnostic) {
       healthInfoResetMessage();
+      setDiagFileContent("");
       const url = new URL(window.location.toString());
       const isDev = process.env.NODE_ENV === "development";
       const port = isDev ? "9090" : url.port;
@@ -189,10 +192,16 @@ const HealthInfo = ({
           setServerDiagStat(DiagStatInProgress);
         };
         c.onmessage = (message: IMessageEvent) => {
-          let m: HealthInfoMessage = JSON.parse(message.data.toString());
-          m.timestamp = new Date(m.timestamp.toString());
-
-          healthInfoMessageReceived(m);
+          let m: ReportMessage = JSON.parse(message.data.toString());
+          if (m.serverHealthInfo) {
+            m.serverHealthInfo.timestamp = new Date(
+              m.serverHealthInfo.timestamp.toString()
+            );
+            healthInfoMessageReceived(m.serverHealthInfo);
+          }
+          if (m.encoded !== "") {
+            setDiagFileContent(m.encoded);
+          }
         };
         c.onerror = (error: Error) => {
           console.log("error closing websocket:", error.message);
@@ -266,7 +275,7 @@ const HealthInfo = ({
                   <div className={classes.localMessage}>{localMessage}</div>
                   {serverDiagnosticStatus === DiagStatInProgress ? (
                     <div className={classes.loading}>
-                      <CircularProgress size={25} />
+                      <Loader style={{ width: 25, height: 25 }} />
                     </div>
                   ) : (
                     <Fragment>
@@ -275,12 +284,7 @@ const HealthInfo = ({
                           type="submit"
                           variant="contained"
                           color="primary"
-                          onClick={() => {
-                            download(
-                              "diagnostic.json",
-                              JSON.stringify(message, null, 2)
-                            );
-                          }}
+                          onClick={() => download()}
                           disabled={downloadDisabled}
                         >
                           Download

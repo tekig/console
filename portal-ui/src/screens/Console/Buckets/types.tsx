@@ -45,6 +45,9 @@ export interface BucketInfo {
   name: string;
   access: string;
   definition: string;
+  creation_date?: string;
+  objects?: number;
+  size?: number;
 }
 
 export interface BucketList {
@@ -178,12 +181,16 @@ export interface BulkReplicationItem {
 interface IExpirationLifecycle {
   days: number;
   date: string;
+  delete_marker?: boolean;
+  noncurrent_expiration_days?: number;
 }
 
 interface ITransitionLifecycle {
   days: number;
   date: string;
   storage_class?: string;
+  noncurrent_transition_days?: number;
+  noncurrent_storage_class?: string;
 }
 
 export interface LifeCycleItem {
@@ -193,4 +200,13 @@ export interface LifeCycleItem {
   transition?: ITransitionLifecycle;
   tags?: any;
   status?: string;
+}
+
+export interface MultiBucketResult {
+  bucketName: string;
+  error?: string;
+}
+
+export interface MultiBucketResult {
+  results: MultiBucketResult[];
 }

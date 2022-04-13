@@ -29,11 +29,15 @@ import {
   wizardCommon,
 } from "../../Common/FormComponents/common/styleLibrary";
 import api from "../../../../common/api";
-import { generatePoolName } from "../../../../common/utils";
+import { generatePoolName, getBytes } from "../../../../common/utils";
 import GenericWizard from "../../Common/GenericWizard/GenericWizard";
 import { IWizardElement } from "../../Common/GenericWizard/types";
 import { NewServiceAccount } from "../../Common/CredentialsPrompt/types";
-import { ErrorResponseHandler, ITenantCreator } from "../../../../common/types";
+import {
+  ErrorResponseHandler,
+  ITenantCreator,
+  ITolerationModel,
+} from "../../../../common/types";
 import { KeyPair } from "../ListTenants/utils";
 
 import { setErrorSnackMessage } from "../../../../actions";
@@ -53,6 +57,14 @@ import Images from "./Steps/Images";
 import PageLayout from "../../Common/Layout/PageLayout";
 import BackLink from "../../../../common/BackLink";
 import TenantResources from "./Steps/TenantResources/TenantResources";
+import ConfigLogSearch from "./Steps/ConfigLogSearch";
+import ConfigPrometheus from "./Steps/ConfigPrometheus";
+import {
+  IMkEnvs,
+  resourcesConfigurations,
+} from "./Steps/TenantResources/utils";
+import HelpBox from "../../../../common/HelpBox";
+import { StorageIcon } from "../../../../icons";
 
 interface IAddTenantProps {
   setErrorSnackMessage: typeof setErrorSnackMessage;
@@ -64,6 +76,8 @@ interface IAddTenantProps {
   namespace: string;
   validPages: string[];
   classes: any;
+  features?: string[];
+  tolerations: ITolerationModel[];
 }
 
 const styles = (theme: Theme) =>
@@ -85,6 +99,8 @@ const AddTenant = ({
   validPages,
   setErrorSnackMessage,
   resetAddTenantForm,
+  features,
+  tolerations,
 }: IAddTenantProps) => {
   // Modals
   const [showNewCredentials, setShowNewCredentials] = useState<boolean>(false);
@@ -93,6 +109,27 @@ const AddTenant = ({
 
   // Fields
   const [addSending, setAddSending] = useState<boolean>(false);
+  const [formRender, setFormRender] = useState<IMkEnvs | null>(null);
+
+  useEffect(() => {
+    let setConfiguration = IMkEnvs.default;
+
+    if (features && features.length !== 0) {
+      const possibleVariables = Object.keys(resourcesConfigurations);
+
+      possibleVariables.forEach((element) => {
+        if (features.includes(element)) {
+          setConfiguration = get(
+            resourcesConfigurations,
+            element,
+            IMkEnvs.default
+          );
+        }
+      });
+    }
+
+    setFormRender(setConfiguration);
+  }, [features]);
 
   /* Send Information to backend */
   useEffect(() => {
@@ -116,13 +153,9 @@ const AddTenant = ({
     const ADURL = fields.identityProvider.ADURL;
     const ADSkipTLS = fields.identityProvider.ADSkipTLS;
     const ADServerInsecure = fields.identityProvider.ADServerInsecure;
-    const ADUserNameSearchFilter =
-      fields.identityProvider.ADUserNameSearchFilter;
     const ADGroupSearchBaseDN = fields.identityProvider.ADGroupSearchBaseDN;
     const ADGroupSearchFilter = fields.identityProvider.ADGroupSearchFilter;
-    const ADGroupNameAttribute = fields.identityProvider.ADGroupNameAttribute;
     const ADUserDNs = fields.identityProvider.ADUserDNs;
-    const ADUserNameFormat = fields.identityProvider.ADUserNameFormat;
     const ADLookupBindDN = fields.identityProvider.ADLookupBindDN;
     const ADLookupBindPassword = fields.identityProvider.ADLookupBindPassword;
     const ADUserDNSearchBaseDN = fields.identityProvider.ADUserDNSearchBaseDN;
@@ -175,8 +208,8 @@ const AddTenant = ({
     const ecParity = fields.tenantSize.ecParity;
     const distribution = fields.tenantSize.distribution;
     const tenantCustom = fields.configure.tenantCustom;
-    const logSearchCustom = fields.configure.logSearchCustom;
-    const prometheusCustom = fields.configure.prometheusCustom;
+    const logSearchEnabled = fields.configure.logSearchEnabled;
+    const prometheusEnabled = fields.configure.prometheusEnabled;
     const logSearchVolumeSize = fields.configure.logSearchVolumeSize;
     const logSearchSelectedStorageClass =
       fields.configure.logSearchSelectedStorageClass;
@@ -205,6 +238,10 @@ const AddTenant = ({
     const kesReplicas = fields.encryption.replicas;
 
     if (addSending) {
+      const tolerationValues = tolerations.filter(
+        (toleration) => toleration.key.trim() !== ""
+      );
+
       const poolName = generatePoolName([]);
 
       let affinityObject = {};
@@ -254,6 +291,7 @@ const AddTenant = ({
             },
             securityContext: tenantCustom ? tenantSecurityContext : null,
             ...affinityObject,
+            tolerations: tolerationValues,
           },
         ],
         erasureCodingParity: parseInt(erasureCode, 10),
@@ -280,7 +318,7 @@ const AddTenant = ({
           }
           if (fields.tenantSize.resourcesMemoryRequest !== "") {
             dataSend.pools[0].resources.requests.memory = parseInt(
-              fields.tenantSize.resourcesMemoryRequest
+              getBytes(fields.tenantSize.resourcesMemoryRequest, "Gi", true)
             );
           }
         }
@@ -297,7 +335,7 @@ const AddTenant = ({
           }
           if (fields.tenantSize.resourcesMemoryLimit !== "") {
             dataSend.pools[0].resources.limits.memory = parseInt(
-              fields.tenantSize.resourcesMemoryLimit
+              getBytes(fields.tenantSize.resourcesMemoryLimit, "Gi", true)
             );
           }
         }
@@ -313,7 +351,7 @@ const AddTenant = ({
         };
       }
 
-      if (logSearchCustom) {
+      if (logSearchEnabled) {
         dataSend = {
           ...dataSend,
           logSearchConfiguration: {
@@ -329,18 +367,9 @@ const AddTenant = ({
             postgres_securityContext: logSearchPostgresSecurityContext,
           },
         };
-      } else {
-        dataSend = {
-          ...dataSend,
-          logSearchConfiguration: {
-            image: logSearchImage,
-            postgres_image: logSearchPostgresImage,
-            postgres_init_image: logSearchPostgresInitImage,
-          },
-        };
       }
 
-      if (prometheusCustom) {
+      if (prometheusEnabled) {
         dataSend = {
           ...dataSend,
           prometheusConfiguration: {
@@ -353,15 +382,6 @@ const AddTenant = ({
             sidecar_image: prometheusSidecarImage,
             init_image: prometheusInitImage,
             securityContext: prometheusSecurityContext,
-          },
-        };
-      } else {
-        dataSend = {
-          ...dataSend,
-          prometheusConfiguration: {
-            image: prometheusImage,
-            sidecar_image: prometheusSidecarImage,
-            init_image: prometheusInitImage,
           },
         };
       }
@@ -515,7 +535,7 @@ const AddTenant = ({
               };
             }
             let vaultTLS = null;
-            if (vaultKeyPair || vaultCA) {
+            if (vaultKeyPair || vaultCAInsert) {
               vaultTLS = {
                 tls: {
                   ...vaultKeyPair,
@@ -616,11 +636,8 @@ const AddTenant = ({
               url: ADURL,
               skip_tls_verification: ADSkipTLS,
               server_insecure: ADServerInsecure,
-              username_format: ADUserNameFormat,
-              username_search_filter: ADUserNameSearchFilter,
               group_search_base_dn: ADGroupSearchBaseDN,
               group_search_filter: ADGroupSearchFilter,
-              group_name_attribute: ADGroupNameAttribute,
               user_dns: ADUserDNs,
               lookup_bind_dn: ADLookupBindDN,
               lookup_bind_password: ADLookupBindPassword,
@@ -652,6 +669,9 @@ const AddTenant = ({
                 return {
                   accessKey: consoleKey.access_key,
                   secretKey: consoleKey.secret_key,
+                  api: "s3v4",
+                  path: "auto",
+                  url: consoleKey.url,
                 };
               });
 
@@ -661,6 +681,7 @@ const AddTenant = ({
                 console: {
                   accessKey: res.console.access_key,
                   secretKey: res.console.secret_key,
+                  url: res.console.url,
                 },
               };
             }
@@ -682,6 +703,7 @@ const AddTenant = ({
     type: "other",
     enabled: true,
     action: () => {
+      resetAddTenantForm();
       history.push("/tenants");
     },
   };
@@ -748,6 +770,18 @@ const AddTenant = ({
       componentRender: <Encryption />,
       buttons: [cancelButton, createButton],
     },
+    {
+      label: "Audit Log",
+      advancedOnly: true,
+      componentRender: <ConfigLogSearch />,
+      buttons: [cancelButton, createButton],
+    },
+    {
+      label: "Monitoring",
+      advancedOnly: true,
+      componentRender: <ConfigPrometheus />,
+      buttons: [cancelButton, createButton],
+    },
   ];
 
   let filteredWizardSteps = wizardSteps;
@@ -769,8 +803,16 @@ const AddTenant = ({
           entity="Tenant"
         />
       )}
-      <PageHeader label={"Create New Tenant"} />
-      <BackLink to={"/tenants"} label={"Return to Tenant List"} />
+      <PageHeader
+        label={
+          <BackLink
+            to={"/tenants"}
+            label={"Tenants"}
+            executeOnClick={resetAddTenantForm}
+          />
+        }
+      />
+
       <PageLayout>
         {addSending && (
           <Grid item xs={12}>
@@ -780,6 +822,29 @@ const AddTenant = ({
         <Grid item xs={12} className={classes.pageBox}>
           <GenericWizard wizardSteps={filteredWizardSteps} />
         </Grid>
+        {formRender === IMkEnvs.aws && (
+          <Grid item xs={12} style={{ marginTop: 16 }}>
+            <HelpBox
+              title={"EBS Volume Configuration."}
+              iconComponent={<StorageIcon />}
+              help={
+                <Fragment>
+                  <b>Performance Optimized</b>: Uses the <i>gp3</i> EBS storage
+                  class class configured at 1,000Mi/s throughput and 16,000
+                  IOPS, however the minimum volume size for this type of EBS
+                  volume is <b>32Gi</b>.
+                  <br />
+                  <br />
+                  <b>Storage Optimized</b>: Uses the <i>sc1</i> EBS storage
+                  class, however the minimum volume size for this type of EBS
+                  volume is &nbsp;
+                  <b>16Ti</b> to unlock their maximum throughput speed of
+                  250Mi/s.
+                </Fragment>
+              }
+            />
+          </Grid>
+        )}
       </PageLayout>
     </Fragment>
   );
@@ -792,6 +857,8 @@ const mapState = (state: AppState) => ({
   certificates: state.tenants.createTenant.certificates,
   selectedStorageClass:
     state.tenants.createTenant.fields.nameTenant.selectedStorageClass,
+  features: state.console.session.features,
+  tolerations: state.tenants.createTenant.tolerations,
 });
 
 const connector = connect(mapState, {

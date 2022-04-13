@@ -44,9 +44,10 @@ import { IAM_SCOPES } from "../../../../common/SecureComponent/permissions";
 import PageLayout from "../../Common/Layout/PageLayout";
 import VerticalTabs from "../../Common/VerticalTabs/VerticalTabs";
 import BackLink from "../../../../common/BackLink";
-import SecureComponent, {
+import {
+  SecureComponent,
   hasPermission,
-} from "../../../../common/SecureComponent/SecureComponent";
+} from "../../../../common/SecureComponent";
 
 import withSuspense from "../../Common/Components/withSuspense";
 import RBIconButton from "./SummaryItems/RBIconButton";
@@ -213,13 +214,7 @@ const BucketDetails = ({
         />
       )}
       <PageHeader
-        label={
-          <Fragment>
-            <Link to={"/buckets"} className={classes.breadcrumLink}>
-              Buckets
-            </Link>
-          </Fragment>
-        }
+        label={<BackLink to={"/buckets"} label={"Buckets"} />}
         actions={
           <Fragment>
             <Tooltip title={"Browse Bucket"}>
@@ -236,7 +231,6 @@ const BucketDetails = ({
           </Fragment>
         }
       />
-      <BackLink to={"/buckets"} label={"Back to Buckets"} />
       <PageLayout className={classes.pageContainer}>
         <Grid item xs={12}>
           <ScreenTitle

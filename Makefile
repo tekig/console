@@ -62,25 +62,155 @@ swagger-operator:
 	@swagger generate server -A operator --main-package=operator --server-package=operatorapi --exclude-main -P models.Principal -f ./swagger-operator.yml -r NOTICE
 
 assets:
-	@(cd portal-ui; yarn install; make build-static; yarn prettier --write . --loglevel warn; cd ..)
+	@(cd portal-ui; yarn install --prefer-offline; make build-static; yarn prettier --write . --loglevel warn; cd ..)
 
 test-integration:
+	@(docker stop pgsqlcontainer || true)
+	@(docker stop minio || true)
+	@(docker network rm mynet123 || true)
+	@echo "create docker network to communicate containers MinIO & PostgreSQL"
+	@(docker network create --subnet=173.18.0.0/29 mynet123)
 	@echo "docker run with MinIO Version below:"
 	@echo $(MINIO_VERSION)
-	@(docker run -d --name minio --rm -p 9000:9000 $(MINIO_VERSION) server /data{1...4} && sleep 5)
-	@(GO111MODULE=on go test -race -v github.com/minio/console/integration/...)
+	@(docker run -v /data1 -v /data2 -v /data3 -v /data4 --net=mynet123 -d --name minio --rm -p 9000:9000 -p 9001:9001 -e MINIO_KMS_SECRET_KEY=my-minio-key:OSMM+vkKUTCvQs9YL/CVMIMt43HFhkUpqJxTmGl6rYw= $(MINIO_VERSION) server /data{1...4} --console-address ':9001' && sleep 5)
+	@(docker run --net=mynet123 --ip=173.18.0.3 --name pgsqlcontainer --rm -p 5432:5432 -e POSTGRES_PASSWORD=password -d postgres && sleep 5)
+	@echo "execute test and get coverage"
+	@(cd integration && go test -coverpkg=../restapi -c -tags testrunmain . && mkdir -p coverage && ./integration.test -test.v -test.run "^Test*" -test.coverprofile=coverage/system.out)
+	@(docker stop pgsqlcontainer)
+	@(docker stop minio)
+	@(docker network rm mynet123)
+
+test-replication:
+	@(docker stop minio || true)
+	@(docker stop minio1 || true)
+	@(docker stop minio2 || true)
+	@(docker network rm mynet123 || true)
+	@(docker network create mynet123)
+	@(docker run -v /data1 -v /data2 -v /data3 -v /data4 \
+	  --net=mynet123 -d \
+	  --name minio \
+	  --rm \
+	  -p 9000:9000 \
+	  -p 6000:6000 \
+	  -e MINIO_KMS_SECRET_KEY=my-minio-key:OSMM+vkKUTCvQs9YL/CVMIMt43HFhkUpqJxTmGl6rYw= \
+	  -e MINIO_ROOT_USER="minioadmin" \
+	  -e MINIO_ROOT_PASSWORD="minioadmin" \
+	  $(MINIO_VERSION) server /data{1...4} \
+	  --address :9000 \
+	  --console-address :6000)
+	@(docker run -v /data1 -v /data2 -v /data3 -v /data4 \
+	  --net=mynet123 -d \
+	  --name minio1 \
+	  --rm \
+	  -p 9001:9001 \
+	  -p 6001:6001 \
+	  -e MINIO_KMS_SECRET_KEY=my-minio-key:OSMM+vkKUTCvQs9YL/CVMIMt43HFhkUpqJxTmGl6rYw= \
+	  -e MINIO_ROOT_USER="minioadmin" \
+	  -e MINIO_ROOT_PASSWORD="minioadmin" \
+	  $(MINIO_VERSION) server /data{1...4} \
+	  --address :9001 \
+	  --console-address :6001)
+	@(docker run -v /data1 -v /data2 -v /data3 -v /data4 \
+	  --net=mynet123 -d \
+	  --name minio2 \
+	  --rm \
+	  -p 9002:9002 \
+	  -p 6002:6002 \
+	  -e MINIO_KMS_SECRET_KEY=my-minio-key:OSMM+vkKUTCvQs9YL/CVMIMt43HFhkUpqJxTmGl6rYw= \
+	  -e MINIO_ROOT_USER="minioadmin" \
+	  -e MINIO_ROOT_PASSWORD="minioadmin" \
+	  $(MINIO_VERSION) server /data{1...4} \
+	  --address :9002 \
+	  --console-address :6002)
+	@(cd replication && go test -coverpkg=../restapi -c -tags testrunmain . && mkdir -p coverage && ./replication.test -test.v -test.run "^Test*" -test.coverprofile=coverage/replication.out)
+	@(docker stop minio || true)
+	@(docker stop minio1 || true)
+	@(docker stop minio2 || true)
+	@(docker network rm mynet123 || true)
+
+test-sso-integration:
+	@echo "create the network in bridge mode to communicate all containers"
+	@(docker network create my-net)
+	@echo "execute latest keycloak container"
+	@(docker run \
+	--rm \
+	--name keycloak-container \
+	--network my-net \
+	-p 8080:8080 \
+	-e KEYCLOAK_USER=admin \
+	-e KEYCLOAK_PASSWORD=admin jboss/keycloak:latest -b 0.0.0.0 -bprivate 127.0.0.1 &)
+	@echo "wait 60 sec until keycloak is listenning on port, then go for minio server"
+	@(sleep 60)
+	@echo "execute keycloak-config-cli container to configure keycloak for Single Sign On with MinIO"
+	@(docker run \
+	--rm \
+	--network my-net \
+	--name keycloak-config-cli \
+	-e KEYCLOAK_URL=http://keycloak-container:8080/auth \
+	-e KEYCLOAK_USER="admin" \
+	-e KEYCLOAK_PASSWORD="admin" \
+	-e KEYCLOAK_AVAILABILITYCHECK_ENABLED=true \
+	-e KEYCLOAK_AVAILABILITYCHECK_TIMEOUT=120s \
+	-e IMPORT_FILES_LOCATIONS='/config/realm-export.json' \
+	-v /home/runner/work/console/console/sso-integration/config:/config \
+	adorsys/keycloak-config-cli:latest)
+	@echo "running minio server"
+	@(docker run \
+	-v /data1 -v /data2 -v /data3 -v /data4 \
+	--network my-net \
+	-d \
+	--name minio \
+	--rm \
+	-p 9000:9000 \
+	-p 9001:9001 \
+	-e MINIO_IDENTITY_OPENID_CLIENT_SECRET=0nfJuqIt0iPnRIUJkvetve5l38C6gi9W \
+	-e MINIO_ROOT_USER=minio \
+	-e MINIO_ROOT_PASSWORD=minio123 $(MINIO_VERSION) server /data{1...4} --address :9000 --console-address :9001)
+	@(sleep 60)
+	@echo "run mc commands"
+	@(docker run --name minio-client --network my-net -dit --entrypoint=/bin/sh minio/mc)
+	@(docker exec minio-client mc alias set myminio/ http://minio:9000 minio minio123)
+	@(docker exec minio-client mc admin config set myminio identity_openid config_url="http://keycloak-container:8080/auth/realms/myrealm/.well-known/openid-configuration" client_id="account")
+	@(docker exec minio-client mc admin service restart myminio)
+	@echo "starting bash script"
+	@(env bash $(PWD)/sso-integration/set-sso.sh)
+	@echo "install jq"
+	@(sudo apt install jq)
+	@echo "Executing the test:"
+	@(cd sso-integration && go test -coverpkg=../restapi -c -tags testrunmain . && mkdir -p coverage && ./sso-integration.test -test.v -test.run "^Test*" -test.coverprofile=coverage/sso-system.out)
+
+test-operator-integration:
+	@(echo "Start cd operator-integration && go test:")
+	@(pwd)
+	@(cd operator-integration && go test -coverpkg=../operatorapi -c -tags testrunmain . && mkdir -p coverage && ./operator-integration.test -test.v -test.run "^Test*" -test.coverprofile=coverage/operator-api.out)
+
+test-operator:
+	@(env bash $(PWD)/portal-ui/tests/scripts/operator.sh)
 	@(docker stop minio)
 
-test-permissions:
-	@(docker run -d --name minio --rm -p 9000:9000 quay.io/minio/minio:latest server /data{1...4})
-	@(env bash $(PWD)/portal-ui/tests/scripts/permissions.sh)
+test-permissions-1:
+	@(docker run -v /data1 -v /data2 -v /data3 -v /data4 -d --name minio --rm -p 9000:9000 quay.io/minio/minio:latest server /data{1...4})
+	@(env bash $(PWD)/portal-ui/tests/scripts/permissions.sh "portal-ui/tests/permissions-1/")
+	@(docker stop minio)
+
+test-permissions-2:
+	@(docker run -v /data1 -v /data2 -v /data3 -v /data4 -d --name minio --rm -p 9000:9000 quay.io/minio/minio:latest server /data{1...4})
+	@(env bash $(PWD)/portal-ui/tests/scripts/permissions.sh "portal-ui/tests/permissions-2/")
+	@(docker stop minio)
+
+test-permissions-3:
+	@(docker run -v /data1 -v /data2 -v /data3 -v /data4 -d --name minio --rm -p 9000:9000 quay.io/minio/minio:latest server /data{1...4})
+	@(env bash $(PWD)/portal-ui/tests/scripts/permissions.sh "portal-ui/tests/permissions-3/")
 	@(docker stop minio)
 
 test-apply-permissions:
 	@(env bash $(PWD)/portal-ui/tests/scripts/initialize-env.sh)
 
 test-start-docker-minio:
-	@(docker run -d --name minio --rm -p 9000:9000 quay.io/minio/minio:latest server /data{1...4})
+	@(docker run -v /data1 -v /data2 -v /data3 -v /data4 -d --name minio --rm -p 9000:9000 quay.io/minio/minio:latest server /data{1...4})
+
+initialize-operator:
+	@echo "Done initializing operator test"
 
 initialize-permissions: test-start-docker-minio test-apply-permissions
 	@echo "Done initializing permissions test"
@@ -90,10 +220,12 @@ cleanup-permissions:
 	@(docker stop minio)
 
 test:
-	@(GO111MODULE=on go test -race -v github.com/minio/console/restapi/...)
+	@echo "execute test and get coverage"
+	@(cd restapi && mkdir coverage && GO111MODULE=on go test -test.v -coverprofile=coverage/coverage.out)
 
 test-pkg:
-	@(GO111MODULE=on go test -race -v github.com/minio/console/pkg/...)
+	@echo "execute test and get coverage"
+	@(cd pkg && mkdir coverage && GO111MODULE=on go test -test.v -coverprofile=coverage/coverage-pkg.out)
 
 coverage:
 	@(GO111MODULE=on go test -v -coverprofile=coverage.out github.com/minio/console/restapi/... && go tool cover -html=coverage.out && open coverage.html)
@@ -106,3 +238,11 @@ clean:
 
 docker:
 	@docker buildx build --output=type=docker --platform linux/amd64 -t $(TAG) --build-arg build_version=$(BUILD_VERSION) --build-arg build_time='$(BUILD_TIME)' .
+
+release: swagger-gen
+	@echo "Generating Release: $(RELEASE)"
+	@make assets
+	@yq -i e '.spec.template.spec.containers[0].image |= "minio/console:$(RELEASE)"' k8s/operator-console/base/console-deployment.yaml
+	@yq -i e 'select(.kind == "Deployment").spec.template.spec.containers[0].image |= "minio/console:$(RELEASE)"' k8s/operator-console/standalone/console-deployment.yaml
+	@git add -u .
+	@git add portal-ui/build/

@@ -23,8 +23,13 @@ import Grid from "@mui/material/Grid";
 import api from "../../../common/api";
 import { Box } from "@mui/material";
 import { NewServiceAccount } from "../Common/CredentialsPrompt/types";
-import { setErrorSnackMessage } from "../../../actions";
-import { AccountIcon, AddIcon, PasswordKeyIcon } from "../../../icons";
+import { setErrorSnackMessage, setSnackBarMessage } from "../../../actions";
+import {
+  AccountIcon,
+  AddIcon,
+  PasswordKeyIcon,
+  DeleteIcon,
+} from "../../../icons";
 import TableWrapper from "../Common/TableWrapper/TableWrapper";
 import { stringSort } from "../../../utils/sortFunctions";
 import PageHeader from "../Common/PageHeader/PageHeader";
@@ -44,8 +49,11 @@ import {
   CONSOLE_UI_RESOURCE,
   IAM_SCOPES,
 } from "../../../common/SecureComponent/permissions";
-import SecureComponent from "../../../common/SecureComponent/SecureComponent";
+import { SecureComponent } from "../../../common/SecureComponent";
 import RBIconButton from "../Buckets/BucketDetails/SummaryItems/RBIconButton";
+import { selectSAs } from "../Configurations/utils";
+import DeleteMultipleServiceAccounts from "../Users/DeleteMultipleServiceAccounts";
+import ServiceAccountPolicy from "./ServiceAccountPolicy";
 
 const AddServiceAccount = withSuspense(
   React.lazy(() => import("./AddServiceAccount"))
@@ -89,6 +97,9 @@ const Account = ({ classes, displayErrorMessage }: IServiceAccountsProps) => {
     useState<NewServiceAccount | null>(null);
   const [changePasswordModalOpen, setChangePasswordModalOpen] =
     useState<boolean>(false);
+  const [selectedSAs, setSelectedSAs] = useState<string[]>([]);
+  const [deleteMultipleOpen, setDeleteMultipleOpen] = useState<boolean>(false);
+  const [policyOpen, setPolicyOpen] = useState<boolean>(false);
 
   useEffect(() => {
     fetchRecords();
@@ -124,6 +135,7 @@ const Account = ({ classes, displayErrorMessage }: IServiceAccountsProps) => {
         console: {
           accessKey: `${res.accessKey}`,
           secretKey: `${res.secretKey}`,
+          url: `${res.url}`,
         },
       };
       setNewServiceAccount(nsa);
@@ -139,9 +151,36 @@ const Account = ({ classes, displayErrorMessage }: IServiceAccountsProps) => {
     }
   };
 
+  const closeDeleteMultipleModalAndRefresh = (refresh: boolean) => {
+    setDeleteMultipleOpen(false);
+    if (refresh) {
+      setSnackBarMessage(`Service accounts deleted successfully.`);
+      setSelectedSAs([]);
+      setLoading(true);
+    }
+  };
+
+  const policyModalOpen = (selectedServiceAccount: string) => {
+    setSelectedServiceAccount(selectedServiceAccount);
+    setPolicyOpen(true);
+  };
+
+  const selectAllItems = () => {
+    if (selectedSAs.length === records.length) {
+      setSelectedSAs([]);
+      return;
+    }
+    setSelectedSAs(records);
+  };
+
   const closeCredentialsModal = () => {
     setShowNewCredentials(false);
     setNewServiceAccount(null);
+  };
+
+  const closePolicyModal = () => {
+    setPolicyOpen(false);
+    setLoading(true);
   };
 
   const confirmDeleteServiceAccount = (selectedServiceAccount: string) => {
@@ -150,6 +189,7 @@ const Account = ({ classes, displayErrorMessage }: IServiceAccountsProps) => {
   };
 
   const tableActions = [
+    { type: "view", onClick: policyModalOpen },
     { type: "delete", onClick: confirmDeleteServiceAccount },
   ];
 
@@ -176,6 +216,13 @@ const Account = ({ classes, displayErrorMessage }: IServiceAccountsProps) => {
           }}
         />
       )}
+      {deleteMultipleOpen && (
+        <DeleteMultipleServiceAccounts
+          deleteOpen={deleteMultipleOpen}
+          selectedSAs={selectedSAs}
+          closeDeleteModalAndRefresh={closeDeleteMultipleModalAndRefresh}
+        />
+      )}
       {showNewCredentials && (
         <CredentialsPrompt
           newServiceAccount={newServiceAccount}
@@ -184,6 +231,13 @@ const Account = ({ classes, displayErrorMessage }: IServiceAccountsProps) => {
             closeCredentialsModal();
           }}
           entity="Service Account"
+        />
+      )}
+      {policyOpen && (
+        <ServiceAccountPolicy
+          open={policyOpen}
+          selectedAccessKey={selectedServiceAccount}
+          closeModalAndRefresh={closePolicyModal}
         />
       )}
       <ChangePasswordModal
@@ -205,6 +259,18 @@ const Account = ({ classes, displayErrorMessage }: IServiceAccountsProps) => {
               display: "flex",
             }}
           >
+            {" "}
+            <RBIconButton
+              tooltip={"Delete Selected"}
+              onClick={() => {
+                setDeleteMultipleOpen(true);
+              }}
+              text={"Delete Selected"}
+              icon={<DeleteIcon />}
+              color="secondary"
+              disabled={selectedSAs.length === 0}
+              variant={"outlined"}
+            />
             <SecureComponent
               scopes={[IAM_SCOPES.ADMIN_CREATE_USER]}
               resource={CONSOLE_UI_RESOURCE}
@@ -219,7 +285,6 @@ const Account = ({ classes, displayErrorMessage }: IServiceAccountsProps) => {
                 variant={"outlined"}
               />
             </SecureComponent>
-
             <RBIconButton
               onClick={() => {
                 setAddScreenOpen(true);
@@ -241,6 +306,9 @@ const Account = ({ classes, displayErrorMessage }: IServiceAccountsProps) => {
             idField={""}
             columns={[{ label: "Service Account", elementKey: "" }]}
             itemActions={tableActions}
+            selectedItems={selectedSAs}
+            onSelect={(e) => selectSAs(e, setSelectedSAs, selectedSAs)}
+            onSelectAll={selectAllItems}
           />
         </Grid>
         <Grid item xs={12} marginTop={"15px"}>

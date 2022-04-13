@@ -24,7 +24,6 @@ import (
 
 	"errors"
 
-	"github.com/minio/console/models"
 	"github.com/minio/madmin-go"
 	"github.com/stretchr/testify/assert"
 )
@@ -43,7 +42,8 @@ func (ac adminClientMock) stopProfiling(ctx context.Context) (io.ReadCloser, err
 }
 
 func TestStartProfiling(t *testing.T) {
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	assert := assert.New(t)
 	adminClient := adminClientMock{}
 	// Test-1 : startProfiling() Get response from Minio server with one profiling object
@@ -63,7 +63,7 @@ func TestStartProfiling(t *testing.T) {
 		}, nil
 	}
 	function := "startProfiling()"
-	cpuProfiler := models.ProfilerType("cpu")
+	cpuProfiler := "cpu"
 	startProfilingResults, err := startProfiling(ctx, adminClient, cpuProfiler)
 	if err != nil {
 		t.Errorf("Failed on %s:, error occurred: %s", function, err.Error())
@@ -91,7 +91,8 @@ func (cb *ClosingBuffer) Close() error {
 }
 
 func TestStopProfiling(t *testing.T) {
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	assert := assert.New(t)
 	adminClient := adminClientMock{}
 	// Test-1 : stopProfiling() Get response from Minio server and that response is a readCloser interface

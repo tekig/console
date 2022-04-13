@@ -1,5 +1,5 @@
 // This file is part of MinIO Console Server
-// Copyright (c) 2021 MinIO, Inc.
+// Copyright (c) 2022 MinIO, Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,20 +15,18 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import React, { Fragment } from "react";
-import { ITenant, ValueUnit } from "./types";
+import { CapacityValues, ITenant, ValueUnit } from "./types";
 import { connect } from "react-redux";
 import { setErrorSnackMessage } from "../../../../actions";
 import Grid from "@mui/material/Grid";
-import { ArrowRightIcon, CircleIcon, SettingsIcon } from "../../../../icons";
 import history from "../../../../history";
-import TenantsIcon from "../../../../icons/TenantsIcon";
 import { Theme } from "@mui/material/styles";
 import createStyles from "@mui/styles/createStyles";
 import withStyles from "@mui/styles/withStyles";
-import { niceBytes } from "../../../../common/utils";
-import UsageBarWrapper from "../../Common/UsageBarWrapper/UsageBarWrapper";
-import { tenantIsOnline } from "./utils";
-import RBIconButton from "../../Buckets/BucketDetails/SummaryItems/RBIconButton";
+import { niceBytes, niceBytesInt } from "../../../../common/utils";
+import InformationItem from "./InformationItem";
+import TenantCapacity from "./TenantCapacity";
+import { DrivesIcon } from "../../../../icons";
 
 const styles = (theme: Theme) =>
   createStyles({
@@ -77,15 +75,21 @@ const styles = (theme: Theme) =>
       height: 10,
     },
     tenantItem: {
-      border: "1px solid #dedede",
-      marginBottom: 20,
-      paddingLeft: 40,
-      paddingRight: 40,
-      paddingTop: 30,
-      paddingBottom: 30,
+      border: "1px solid #EAEAEA",
+      marginBottom: 16,
+      padding: "15px 30px",
+      "&:hover": {
+        backgroundColor: "#FAFAFA",
+        cursor: "pointer",
+      },
+    },
+    titleContainer: {
+      display: "flex",
+      justifyContent: "space-between",
+      width: "100%",
     },
     title: {
-      fontSize: 22,
+      fontSize: 18,
       fontWeight: "bold",
     },
     titleSubKey: {
@@ -112,6 +116,18 @@ const styles = (theme: Theme) =>
       marginRight: 8,
       textTransform: "initial",
     },
+    namespaceLabel: {
+      display: "inline-flex",
+      backgroundColor: "#EAEDEF",
+      borderRadius: 2,
+      padding: "4px 8px",
+      fontSize: 10,
+      marginRight: 20,
+    },
+    status: {
+      fontSize: 12,
+      color: "#8F9090",
+    },
   });
 
 interface ITenantListItem {
@@ -133,9 +149,11 @@ const TenantListItem = ({ tenant, classes }: ITenantListItem) => {
     }
   };
 
-  var raw: ValueUnit = { value: "n/a", unit: "" };
-  var capacity: ValueUnit = { value: "n/a", unit: "" };
-  var used: ValueUnit = { value: "n/a", unit: "" };
+  let raw: ValueUnit = { value: "n/a", unit: "" };
+  let capacity: ValueUnit = { value: "n/a", unit: "" };
+  let used: ValueUnit = { value: "n/a", unit: "" };
+  let localUse: ValueUnit = { value: "n/a", unit: "" };
+  let tieredUse: ValueUnit = { value: "n/a", unit: "" };
 
   if (tenant.capacity_raw) {
     const b = niceBytes(`${tenant.capacity_raw}`, true);
@@ -150,124 +168,191 @@ const TenantListItem = ({ tenant, classes }: ITenantListItem) => {
     capacity.unit = parts[1];
   }
   if (tenant.capacity_usage) {
-    const usageProportion =
-      (tenant.capacity! * tenant.capacity_raw_usage!) / tenant.capacity_raw!;
-    const b = niceBytes(`${usageProportion}`, true);
+    const b = niceBytesInt(tenant.capacity_usage, true);
     const parts = b.split(" ");
     used.value = parts[0];
     used.unit = parts[1];
   }
 
+  let spaceVariants: CapacityValues[] = [];
+  if (!tenant.tiers || tenant.tiers.length === 0) {
+    spaceVariants = [
+      { value: tenant.capacity_usage || 0, variant: "STANDARD" },
+    ];
+  } else {
+    spaceVariants = tenant.tiers.map((itemTenant) => {
+      return { value: itemTenant.size, variant: itemTenant.name };
+    });
+    let internalUsage = tenant.tiers
+      .filter((itemTenant) => {
+        return itemTenant.type === "internal";
+      })
+      .reduce((sum, itemTenant) => sum + itemTenant.size, 0);
+    let tieredUsage = tenant.tiers
+      .filter((itemTenant) => {
+        return itemTenant.type !== "internal";
+      })
+      .reduce((sum, itemTenant) => sum + itemTenant.size, 0);
+
+    const t = niceBytesInt(tieredUsage, true);
+    const parts = t.split(" ");
+    tieredUse.value = parts[0];
+    tieredUse.unit = parts[1];
+
+    const is = niceBytesInt(internalUsage, true);
+    const partsInternal = is.split(" ");
+    localUse.value = partsInternal[0];
+    localUse.unit = partsInternal[1];
+  }
+
+  const openTenantDetails = () => {
+    history.push(`/namespaces/${tenant.namespace}/tenants/${tenant.name}`);
+  };
+
   return (
     <Fragment>
-      <div className={classes.tenantItem}>
+      <div
+        className={classes.tenantItem}
+        id={`list-tenant-${tenant.name}`}
+        onClick={openTenantDetails}
+      >
         <Grid container>
-          <Grid item xs={8}>
-            <div className={classes.title}>{tenant.name}</div>
+          <Grid item xs={12} className={classes.titleContainer}>
+            <div className={classes.title}>
+              <span>{tenant.name}</span>
+            </div>
             <div>
-              <span className={classes.titleSubKey}>Namespace:</span>
-              <span className={classes.titleSubValue}>{tenant.namespace}</span>
-              <span className={classes.titleSubKey}>Pools:</span>
-              <span className={classes.titleSubValue}>{tenant.pool_count}</span>
-              <span className={classes.titleSubKey}>State:</span>
-              <span className={classes.titleSubValue}>
-                {tenant.currentState}
+              <span className={classes.namespaceLabel}>
+                Namespace:&nbsp;{tenant.namespace}
               </span>
             </div>
           </Grid>
-          <Grid item xs={4} textAlign={"end"}>
-            <RBIconButton
-              tooltip={"Manage Tenant"}
-              text={"Manage"}
-              disabled={!tenantIsOnline(tenant)}
-              onClick={() => {
-                history.push(
-                  `/namespaces/${tenant.namespace}/tenants/${tenant.name}/hop`
-                );
-              }}
-              icon={<SettingsIcon />}
-              color="primary"
-              variant={"outlined"}
-            />
-            <RBIconButton
-              tooltip={"View Tenant"}
-              text={"View"}
-              onClick={() => {
-                history.push(
-                  `/namespaces/${tenant.namespace}/tenants/${tenant.name}`
-                );
-              }}
-              icon={<ArrowRightIcon />}
-              color="primary"
-              variant={"contained"}
-            />
-          </Grid>
-          <Grid item xs={12}>
-            <hr />
-          </Grid>
-          <Grid item xs={12}>
-            <Grid container alignItems={"center"}>
-              <Grid item xs={7}>
-                <Grid container>
-                  <Grid item xs={3} style={{ textAlign: "center" }}>
-                    <div className={classes.tenantIcon}>
-                      <TenantsIcon style={{ height: 40, width: 40 }} />
-                      <div className={classes.healthStatusIcon}>
-                        <span
-                          className={healthStatusToClass(tenant.health_status)}
-                        >
-                          <CircleIcon />
-                        </span>
-                      </div>
-                    </div>
-                  </Grid>
-                  <Grid item xs={3}>
-                    <Grid container>
-                      <Grid item xs={12} className={classes.boxyTitle}>
-                        Raw Capacity
-                      </Grid>
-                      <Grid item className={classes.boxyValue}>
-                        {raw.value}
-                        <span className={classes.boxyUnit}>{raw.unit}</span>
-                      </Grid>
-                    </Grid>
-                  </Grid>
-                  <Grid item xs={3}>
-                    <Grid container>
-                      <Grid item xs={12} className={classes.boxyTitle}>
-                        Capacity
-                      </Grid>
-                      <Grid item className={classes.boxyValue}>
-                        {capacity.value}
-                        <span className={classes.boxyUnit}>
-                          {capacity.unit}
-                        </span>
-                      </Grid>
-                    </Grid>
-                  </Grid>
-                  <Grid item xs={3}>
-                    <Grid container>
-                      <Grid item xs={12} className={classes.boxyTitle}>
-                        Usage
-                      </Grid>
-                      <Grid item className={classes.boxyValue}>
-                        {used.value}
-                        <span className={classes.boxyUnit}>{used.unit}</span>
-                      </Grid>
-                    </Grid>
-                  </Grid>
+          <Grid item xs={12} sx={{ marginTop: 2 }}>
+            <Grid container>
+              <Grid item xs={2}>
+                <TenantCapacity
+                  totalCapacity={tenant.capacity_raw || 0}
+                  usedSpaceVariants={spaceVariants}
+                  statusClass={healthStatusToClass(tenant.health_status)}
+                />
+              </Grid>
+              <Grid item xs>
+                <Grid
+                  item
+                  xs
+                  sx={{
+                    display: "flex",
+                    justifyContent: "flex-start",
+                    alignItems: "center",
+                    marginTop: "10px",
+                  }}
+                >
+                  <InformationItem
+                    label={"Raw Capacity"}
+                    value={raw.value}
+                    unit={raw.unit}
+                  />
+                  <InformationItem
+                    label={"Usable Capacity"}
+                    value={capacity.value}
+                    unit={capacity.unit}
+                  />
+                  <InformationItem
+                    label={"Pools"}
+                    value={tenant.pool_count.toString()}
+                    variant={"faded"}
+                  />
+                </Grid>
+                <Grid
+                  item
+                  xs={12}
+                  sx={{ paddingLeft: "20px", marginTop: "15px" }}
+                >
+                  <span className={classes.status}>
+                    <strong>State:</strong> {tenant.currentState}
+                  </span>
                 </Grid>
               </Grid>
-              <Grid item xs={5}>
-                <UsageBarWrapper
-                  currValue={tenant.capacity_raw_usage ?? 0}
-                  maxValue={tenant.capacity_raw ?? 1}
-                  label={""}
-                  renderFunction={niceBytes}
-                  error={""}
-                  loading={false}
-                  labels={false}
-                />
+              <Grid item xs={3}>
+                <Fragment>
+                  <Grid container>
+                    <Grid
+                      item
+                      xs={2}
+                      textAlign={"center"}
+                      justifyContent={"center"}
+                      justifyItems={"center"}
+                    >
+                      <DrivesIcon
+                        style={{ width: 25, color: "rgb(91,91,91)" }}
+                      />
+                      <div
+                        style={{
+                          color: "rgb(118, 118, 118)",
+                          fontSize: 12,
+                          fontWeight: "400",
+                        }}
+                      >
+                        Usage
+                      </div>
+                    </Grid>
+                    <Grid item xs={1} />
+                    <Grid item style={{ paddingTop: 8 }}>
+                      {(!tenant.tiers || tenant.tiers.length === 0) && (
+                        <div
+                          style={{
+                            fontSize: 14,
+                            fontWeight: 400,
+                          }}
+                        >
+                          <span
+                            style={{
+                              color: "rgb(62,62,62)",
+                            }}
+                          >
+                            Internal:{" "}
+                          </span>{" "}
+                          {`${used.value} ${used.unit}`}
+                        </div>
+                      )}
+
+                      {tenant.tiers && tenant.tiers.length > 0 && (
+                        <Fragment>
+                          <div
+                            style={{
+                              fontSize: 14,
+                              fontWeight: 400,
+                            }}
+                          >
+                            <span
+                              style={{
+                                color: "rgb(62,62,62)",
+                              }}
+                            >
+                              Internal:{" "}
+                            </span>{" "}
+                            {`${localUse.value} ${localUse.unit}`}
+                          </div>
+                          <div
+                            style={{
+                              fontSize: 14,
+                              fontWeight: 400,
+                            }}
+                          >
+                            <span
+                              style={{
+                                color: "rgb(62,62,62)",
+                              }}
+                            >
+                              Tiered:{" "}
+                            </span>{" "}
+                            {`${tieredUse.value} ${tieredUse.unit}`}
+                          </div>
+                        </Fragment>
+                      )}
+                    </Grid>
+                  </Grid>
+                </Fragment>
               </Grid>
             </Grid>
           </Grid>
